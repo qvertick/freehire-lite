@@ -6,7 +6,7 @@
   import GhostChecklist from '#lib/components/GhostChecklist.svelte';
   import Prevalence from '#lib/components/ghost/Prevalence.svelte';
   import SignalDiagram from '#lib/components/ghost/SignalDiagram.svelte';
-  import { NumberedGrid, SectionLabel } from '#lib/ui/index.js';
+  import { SectionLabel } from '#lib/ui/index.js';
   import { CRITERIA } from '#lib/ghost.js';
   import type { Ghost } from '#lib/generated/contracts.js';
   import { GHOST_FAQ } from '#lib/ghostFaq.js';
@@ -54,9 +54,8 @@
         Some postings are not being filled. freehire tells you which, and why it thinks so.
       </h1>
       <p class="text-base leading-relaxed text-muted-foreground">
-        You can't tell by looking at the page. An hour spent on one is work you'll never
-        hear back about. So freehire checks two things it can actually see: how the posting
-        behaves, and what happened to people who applied.
+        A posting's age and history can add useful context, but they cannot prove an
+        employer's intent. freehire shows the evidence it has and keeps the uncertainty visible.
       </p>
 
       <!-- Two lines, not a section. The limit on the claim is the feature's most
@@ -81,9 +80,6 @@
 
       <div class="flex flex-wrap gap-3">
         <Button href={resolve('/jobs')} variant="primary" size="lg">Browse jobs</Button>
-        <Button href={resolve('/my/tracking')} variant="ghost" size="lg">
-          Track your applications
-        </Button>
       </div>
     </div>
 
@@ -157,31 +153,6 @@
   <!-- How a person's experience becomes evidence. The waiting period and the anonymity
        gate are not restated here — the reports diagram above draws both, and saying it
        twice says it the second time more weakly. -->
-  <section class="flex flex-col gap-5">
-    <SectionLabel text="your part" />
-    <p class="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-      The strongest signal is one only you can give: you applied and nobody answered. There
-      are two ways it reaches us.
-    </p>
-    <NumberedGrid
-      items={[
-        {
-          n: '01',
-          title: 'Report it yourself',
-          body: 'On the job, pick Report → “No response”. It asks one thing: when you applied. That date is what tells a real silence apart from impatience. You can take the report back if the company answers later.',
-        },
-        {
-          n: '02',
-          title: 'Or connect a mailbox',
-          body: 'Then it happens on its own: freehire sees the reply arrive, or sees that it never did. Without a connected mailbox nothing is counted — we could not tell silence from a gap in our own data.',
-        },
-      ]}
-    />
-    <div class="flex flex-wrap gap-3">
-      <Button href={resolve('/features/inbox')} variant="outline">How the inbox works</Button>
-    </div>
-  </section>
-
   <!-- Honest limits of coverage — a different thing from the limit on the claim, which is
        in the hero where a reader cannot miss it. -->
   <section class="flex flex-col gap-4">
@@ -226,14 +197,13 @@
   </section>
 
   <section class="flex flex-col items-start gap-4 rounded-lg border border-border p-6">
-    <h2 class="text-lg font-semibold tracking-tight">Stop applying into the void</h2>
+    <h2 class="text-lg font-semibold tracking-tight">Read the evidence in context</h2>
     <p class="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-      The catalogue is open and needs no account. Tracking your applications is what makes
-      the signal sharper — for you, and for whoever reads the posting after you.
+      A warning is a signal, not a verdict. Compare the details and decide whether a posting
+      is worth your time.
     </p>
     <div class="flex flex-wrap gap-3">
       <Button href={resolve('/jobs')} variant="primary">Browse jobs</Button>
-      <Button href={resolve('/my/tracking')} variant="ghost">Your tracking board</Button>
     </div>
   </section>
 </article>

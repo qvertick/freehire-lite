@@ -18,7 +18,6 @@ import {
   facetRemove,
   defaultSortFor,
   effectiveSort,
-  matchSortNeedsSkills,
   appliesWorkModeRemoteAnywhere,
   workModeRemoteLabel,
   sortOptionsFor,
@@ -398,7 +397,7 @@ describe('savedSearchQuery', () => {
   it('drops the ordering from the saved-search key', () => {
     expect(new URLSearchParams(savedSearchQuery(withQuery('go', 'views'))).get('sort')).toBeNull();
     expect(new URLSearchParams(savedSearchQuery(withQuery('go', 'newest'))).get('sort')).toBeNull();
-    expect(new URLSearchParams(savedSearchQuery(withQuery('go', 'match'))).get('sort')).toBeNull();
+    expect(new URLSearchParams(savedSearchQuery(withQuery('go', 'views'))).get('sort')).toBeNull();
   });
 
   it('keeps every filter that decides which jobs are in the set', () => {
@@ -475,7 +474,7 @@ describe('sign transitions (pure)', () => {
   });
 });
 
-// The sort vocabulary is `relevance` / `newest` / `match`, and its DEFAULT depends on
+// The sort vocabulary is `relevance` / `newest` / `views`, and its DEFAULT depends on
 // whether there is query text — mirroring the endpoint, which orders by relevance under
 // a query and by posting date without one (internal/api/handler/search.go). Serializing
 // the default therefore means writing nothing: the absence of `sort` is exactly how the
@@ -516,22 +515,9 @@ describe('sort', () => {
     expect(filtersFromParams(new URLSearchParams('q=go&sort=posted_at')).sort).toBe('newest');
   });
 
-  it('round-trips the match sort', () => {
-    expect(filtersFromParams(new URLSearchParams('sort=match')).sort).toBe('match');
-    expect(filtersToParams({ ...emptyFilters(), sort: 'match' }).get('sort')).toBe('match');
-  });
-
-  it('keeps a match sort alongside the other filters', () => {
-    const f = filtersFromParams(new URLSearchParams('sort=match&countries=DE'));
-    expect(f.sort).toBe('match');
-    expect(must(f.facets.countries).include).toEqual(['DE']);
-  });
-
-  // A signed-out visitor opening a shared match link must keep the param: the server
-  // degrades the ordering for them, and signing in should then just work.
-  it('preserves the match sort through a params round trip', () => {
-    const f = filtersFromParams(new URLSearchParams('sort=match'));
-    expect(filtersToParams(f).get('sort')).toBe('match');
+  it('ignores the removed profile-match sort and falls back to the public default', () => {
+    expect(filtersFromParams(new URLSearchParams('sort=match')).sort).toBeNull();
+    expect(filtersToParams(filtersFromParams(new URLSearchParams('sort=match'))).get('sort')).toBeNull();
   });
 
   // Relevance has nothing to rank against once the query goes. The collapse is a pure
@@ -539,7 +525,6 @@ describe('sort', () => {
   it('collapses relevance to newest when the query is empty', () => {
     expect(effectiveSort(withQuery('', 'relevance'))).toBe('newest');
     expect(effectiveSort(withQuery('go', 'relevance'))).toBe('relevance');
-    expect(effectiveSort(withQuery('', 'match'))).toBe('match');
   });
 
   it('serializes a stranded relevance selection as the browse default', () => {
@@ -591,21 +576,11 @@ describe('sort', () => {
   });
 });
 
-// The option list is the sort control's visibility rule, kept pure and out of the
-// component so it can be tested at all — the same argument that put effectiveSort here.
+// The option list is kept pure so callers and tests share the same ordering choices.
 describe('sort options', () => {
-  // Match is offered to everyone now, including a visitor with no skills on file. It
-  // used to be hidden from them, which answered "why can I not sort by fit?" with
-  // nothing at all; the feed explains what the ordering needs instead (see
-  // matchSortNeedsSkills).
-  it('offers relevance only under a query, and match always', () => {
-    expect(sortOptionsFor('').map((o) => o.value)).toEqual(['newest', 'views', 'match']);
-    expect(sortOptionsFor('go').map((o) => o.value)).toEqual([
-      'relevance',
-      'newest',
-      'views',
-      'match',
-    ]);
+  it('offers relevance only under a query', () => {
+    expect(sortOptionsFor('').map((o) => o.value)).toEqual(['newest', 'views']);
+    expect(sortOptionsFor('go').map((o) => o.value)).toEqual(['relevance', 'newest', 'views']);
   });
 
   // `views` ranks by a stored figure, so unlike `relevance` it needs no query text.
@@ -622,12 +597,12 @@ describe('sort options', () => {
   it('shows what the server will serve when the chosen ordering cannot be offered', () => {
     expect(selectedSortFor(withQuery('', 'relevance'))).toBe('newest');
     expect(selectedSortFor(withQuery('go', 'relevance'))).toBe('relevance');
-    expect(selectedSortFor(withQuery('', 'match'))).toBe('match');
+    expect(selectedSortFor(withQuery('', 'views'))).toBe('views');
   });
 
   it('always names an option that exists', () => {
     for (const q of ['', 'go']) {
-      for (const sort of ['match', 'relevance', 'views', 'newest'] as const) {
+      for (const sort of ['relevance', 'views', 'newest'] as const) {
         const f = withQuery(q, sort);
         expect(sortOptionsFor(q).map((o) => o.value)).toContain(selectedSortFor(f));
       }
@@ -727,32 +702,6 @@ describe('the two date bounds', () => {
     expect(activeFilterCount(f)).toBe(none + 1);
     f.postedWithinDays = 3;
     expect(activeFilterCount(f)).toBe(none + 2);
-  });
-});
-
-// The feed's answer to "I picked Match and it did not rank anything". The ordering needs
-// the viewer's own skills; without them the server degrades to newest and, told nothing,
-// the visitor reads that as the sort being broken.
-describe('matchSortNeedsSkills', () => {
-  it('asks for skills only when match is the ordering in force', () => {
-    expect(matchSortNeedsSkills(withQuery('', 'match'), false)).toBe(true);
-    expect(matchSortNeedsSkills(withQuery('', 'newest'), false)).toBe(false);
-    expect(matchSortNeedsSkills(withQuery('', 'views'), false)).toBe(false);
-  });
-
-  it('stays quiet once the viewer has skills to rank against', () => {
-    expect(matchSortNeedsSkills(withQuery('', 'match'), true)).toBe(false);
-  });
-
-  // A query plus ?sort=match still means match: `relevance` is only the DEFAULT under a
-  // query, not an override of a stated one.
-  it('asks under a query too', () => {
-    expect(matchSortNeedsSkills(withQuery('go', 'match'), false)).toBe(true);
-  });
-
-  // Nobody asked for match here, so there is nothing to explain.
-  it('says nothing when no ordering was stated', () => {
-    expect(matchSortNeedsSkills(emptyFilters(), false)).toBe(false);
   });
 });
 

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Fails when this change breaks a client of the public API, as described by
-# web/static/openapi.yaml — the contract served at freehire.me/openapi.yaml, which paid
-# API keys are now sold against.
+# web/static/openapi.yaml — the public contract served at freehire.me/openapi.yaml.
 #
 # "Breaking" is oasdiff's verdict at ERR level: a removed endpoint or field, a request
 # bound that rejects values the old contract accepted, a response property that promises

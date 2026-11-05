@@ -1,24 +1,14 @@
 <script lang="ts">
   import { dynamicLabel, FACETS } from '#lib/facets.js';
-  import { type FilterStore, savedSearchQuery, displayQuery, appliesWorkModeRemoteAnywhere, workModeRemoteLabel } from '#lib/filters.js';
+  import { type FilterStore, displayQuery, appliesWorkModeRemoteAnywhere, workModeRemoteLabel } from '#lib/filters.js';
   import { experienceLabel, freshnessLabel, salaryLabel } from '#lib/filterControls.js';
   import { unsummarized } from '#lib/filterSummary.js';
-  import { isAuthenticated } from '#lib/auth.svelte.js';
-  import { applyQuestionsBoundLabel } from '#lib/jobFacts.js';
   import FilterSummaryShell, { type SummaryChip, type SummaryGroup } from './FilterSummaryShell.svelte';
-  import SaveSearchAlert from './SaveSearchAlert.svelte';
 
   // The job filters sidebar: a summary of the *applied* filters as chips grouped by
   // facet, over the reusable FilterSummaryShell. Removing a chip edits the live store
   // directly — the sidebar applies immediately; only the modal defers. The shared
-  // save-then-alert control (Save filter → get it in Telegram) sits under the
-  // All-filters button on the standalone list (`canSave`); the modal's "My filters"
-  // tab drives the same control.
-  let { store, exclude = [], onOpen, canSave = false, description }: { store: FilterStore; exclude?: string[]; onOpen: () => void; canSave?: boolean; description?: string } = $props();
-
-  // The current filters as the saved-search / alert target. The ordering is view-only
-  // and savedSearchQuery drops it, so reordering the feed never marks this dirty.
-  const current = $derived(savedSearchQuery(store.value));
+  let { store, exclude = [], onOpen, description }: { store: FilterStore; exclude?: string[]; onOpen: () => void; description?: string } = $props();
 
   function valueLabel(param: string, value: string): string {
     const def = FACETS.find((d) => d.param === param);
@@ -81,15 +71,6 @@
     facetGroup('engagement', 'Contract terms');
     facetGroup('collections', 'Collection');
     facetGroup('company_slug', 'Company');
-    // Signed out the server ignores it, so a chip would claim a narrowing that did not happen.
-    if (f.formerEmployers && isAuthenticated())
-      push('Hiring again', [
-        { key: 'former_employers', text: 'Your former employers', exclude: false, remove: () => store.setFormerEmployers(false) },
-      ]);
-    // Same server-side rule as above. Without a chip the sidebar reads "No filters yet"
-    // while viewed jobs are being left out, and there is nothing to click to bring them back.
-    if (f.hideSeen && isAuthenticated())
-      push('Viewed', [{ key: 'hide_seen', text: 'Hidden', exclude: false, remove: () => store.setHideSeen(false) }]);
     facetGroup('english_level', 'English');
     facetGroup('posting_language', 'Job language');
     facetGroup('relocation', 'Relocation');
@@ -103,23 +84,6 @@
     facetGroup('equity', 'Equity');
 
     if (f.visa) push('Visa', [{ key: 'visa', text: 'Sponsorship', exclude: false, remove: () => store.setVisa(false) }]);
-    if (f.autoApplyAvailable)
-      push('Auto-apply', [
-        { key: 'auto_apply_available', text: 'Available', exclude: false, remove: () => store.setAutoApplyAvailable(false) },
-      ]);
-    if (f.applyQuestionsMax != null)
-      push('Application', [
-        {
-          key: 'apply_questions_max',
-          text: applyQuestionsBoundLabel(f.applyQuestionsMax),
-          exclude: false,
-          remove: () => store.setApplyQuestionsMax(null),
-        },
-      ]);
-    if (f.hideAIInterview)
-      push('AI interview', [
-        { key: 'ai_interview', text: 'Hidden', exclude: true, remove: () => store.setHideAIInterview(false) },
-      ]);
     facetGroup('clearance_levels', 'Clearance');
     // Two chips under two headings, never merged: they are separate bounds, and a
     // reader who set only one must be able to see which. `Open` is not gated on the
@@ -145,11 +109,4 @@
 </script>
 
 <FilterSummaryShell {groups} active={store.active} onReset={() => store.clear()} {onOpen} {description}>
-  {#snippet afterButton()}
-    {#if canSave && store.value.formerEmployers}
-      <p class="text-sm text-muted-foreground">Turn off Hiring again to save this search or set up alerts.</p>
-    {:else if canSave}
-      <SaveSearchAlert query={current} variant="full" alerts="manage" />
-    {/if}
-  {/snippet}
 </FilterSummaryShell>

@@ -5,9 +5,9 @@ import type { PageServerLoad } from './$types';
 // every scale figure as a single snapshot, so the numbers here and the ones on /open
 // describe the same measurement rather than two list totals taken at two moments.
 //
-// The endpoint itself never fails — with no published snapshot it answers with an
-// approximate open-job count. The catch covers the transport (the API unreachable), in
-// which case HomeView falls back to its static "+" figures.
+// The endpoint can return approximate data when no exact snapshot is available. The
+// catch covers transport failures; HomeView omits unavailable figures rather than
+// presenting stale or illustrative counts.
 export const load: PageServerLoad = async ({ fetch }) => {
   try {
     const scale = await serverApi(fetch).catalogScale();
@@ -18,8 +18,8 @@ export const load: PageServerLoad = async ({ fetch }) => {
         // as companies below.
         jobs: scale.unique_open_jobs || null,
         // Only the exact snapshot carries a company count; a degraded read reports
-        // zero, which is "not measured", not "none". Null instead, so HomeView shows
-        // its last-known figure rather than printing "0+ companies".
+        // zero, which is "not measured", not "none". Null instead, so HomeView omits
+        // the figure until an exact count is available.
         companies: scale.exact ? scale.companies : null,
         sources: scale.sources,
       },

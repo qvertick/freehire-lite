@@ -11,7 +11,7 @@
 // Usage: node scripts/check-doc-links.mjs
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
 
 // Tracked files only, from git. A walk would have to re-derive .gitignore, and would read
@@ -21,7 +21,9 @@ function tracked() {
   return out.split('\0').filter(Boolean);
 }
 
-const TRACKED = new Set(tracked());
+// A tracked file can be deleted in the worktree before the change is staged.
+// Ignore it as a source document, but keep the remaining link checks against it.
+const TRACKED = new Set(tracked().filter((file) => existsSync(file)));
 // Directory prefixes, so a link to a folder resolves. git tracks files, not directories.
 const TRACKED_DIRS = new Set();
 for (const f of TRACKED) {
@@ -43,7 +45,7 @@ for (const f of TRACKED) {
  * anyone can follow either.
  */
 function resolvesInRepo(fromFile, target) {
-  const p = normalize(join(dirname(fromFile), target));
+  const p = normalize(join(dirname(fromFile), target)).replaceAll('\\', '/');
   if (p.startsWith('..')) return false; // escaped the repository root
   return TRACKED.has(p) || TRACKED_DIRS.has(p);
 }

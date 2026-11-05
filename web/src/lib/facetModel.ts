@@ -167,11 +167,8 @@ export function displayQuery(q: string): string {
   return q.length >= 2 && q.startsWith('"') && q.endsWith('"') ? q.slice(1, -1) : q;
 }
 
-/** The feed's ordering vocabulary. Deliberately short: this is not a general sort
- *  control (the API also accepts created_at and the salary bounds), it is the two
- *  orderings the endpoint defaults between, plus the profile-match feed and the
- *  most-opened feed. */
-export type JobSort = 'relevance' | 'newest' | 'views' | 'match';
+/** The feed's public ordering vocabulary. */
+export type JobSort = 'relevance' | 'newest' | 'views';
 
 /** The ordering the endpoint applies when a request carries no `sort` at all:
  *  relevance under query text, posting date without it (see `searchSort` in
@@ -204,7 +201,6 @@ export function effectiveSort(f: JobFilters): JobSort {
 const SORT_PARAM: Partial<Record<JobSort, string>> = {
   newest: 'posted_at',
   views: 'view_count',
-  match: 'match',
 };
 
 /** SORT_PARAM inverted, so the two directions cannot drift. */
@@ -216,7 +212,6 @@ const SORT_LABEL: Record<JobSort, string> = {
   relevance: 'Relevance',
   newest: 'Newest',
   views: 'Most viewed',
-  match: 'Best match',
 };
 
 export interface SortOption {
@@ -224,25 +219,9 @@ export interface SortOption {
   label: string;
 }
 
-/** The orderings a caller can actually choose between, in display order.
- *
- *  `relevance` is the only conditional one: it ranks against query text, so without any
- *  there is nothing for it to rank. `newest`, `views` and `match` always apply.
- *
- *  `match` was conditional too — it needed a profile with skills. That hid the one
- *  ordering that answers "which of these suit me" from precisely the people who had not
- *  filled a profile in, and told them nothing. It is offered to everyone now, and the
- *  view explains what it needs when there is nothing to rank against (see
- *  matchSortNeedsSkills below).
- *
- *  It lives here, not in the view, for the reason effectiveSort does: it is pure, it
- *  decides what the user sees, and in the component nothing could test it. */
+/** The orderings a caller can choose between, in display order. */
 export function sortOptionsFor(q: string): SortOption[] {
-  // Match is offered to everyone, including a viewer with no skills on file. Hiding it
-  // from them answered "why can I not sort by fit here?" with nothing at all — and it
-  // hid the reason to fill in a profile from exactly the people who have not. What they
-  // get instead is an explanation of what the ordering needs; see matchSortNeedsSkills.
-  const values: JobSort[] = [...(q ? (['relevance'] as const) : []), 'newest', 'views', 'match'];
+  const values: JobSort[] = [...(q ? (['relevance'] as const) : []), 'newest', 'views'];
   return values.map((value) => ({ value, label: SORT_LABEL[value] }));
 }
 
@@ -257,16 +236,6 @@ export function selectedSortFor(f: JobFilters): JobSort {
   const sort = effectiveSort(f);
   const offered = sortOptionsFor(f.q);
   return offered.some((o) => o.value === sort) ? sort : defaultSortFor(f.q);
-}
-
-/** Whether the feed should explain that the match ordering has nothing to rank against.
- *
- *  Only when match is the ordering actually in force AND the viewer has no skills on
- *  file. The server degrades such a request to newest rather than refusing it, so the
- *  list still fills — and a visitor told nothing reads that as the sort being broken
- *  rather than as a profile they have not filled in yet. */
-export function matchSortNeedsSkills(f: JobFilters, hasSkills: boolean): boolean {
-  return effectiveSort(f) === 'match' && !hasSkills;
 }
 
 /** Splits every raw query value on comma and flattens the result, dropping

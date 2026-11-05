@@ -536,6 +536,21 @@ func Load() Settings {
 // StrictAnonLimits reports PUBLIC_ANON_LIMITS=strict, the one value besides empty it accepts.
 func (s Settings) StrictAnonLimits() bool { return s.PublicAnonLimits == "strict" }
 
+// ValidateJobSearcher checks settings used by the public catalogue server without
+// requiring credentials for account, AI, or recruiting features.
+func (s Settings) ValidateJobSearcher() error {
+	if s.DatabaseURL == "" {
+		return errors.New("DATABASE_URL is required")
+	}
+	if s.Port == "" {
+		return errors.New("PORT is required")
+	}
+	if s.PublicAnonLimits != "" && !s.StrictAnonLimits() {
+		return fmt.Errorf("PUBLIC_ANON_LIMITS must be empty or \"strict\", got %q", s.PublicAnonLimits)
+	}
+	return nil
+}
+
 // Validate checks that the configuration values are safe to boot the auth surface with.
 // The JWT secret check runs in every environment, not just production: HS256 security
 // rests entirely on secret entropy, so a short secret is brute-forceable offline against

@@ -23,33 +23,32 @@
     data.pageNumber > 1 ? `${origin}/companies?page=${data.pageNumber}` : `${origin}/companies`
   );
   const description =
-    'Browse companies hiring in tech, with their current open roles — aggregated by freehire.';
+    'Browse companies with open vacancies across supported job platforms.';
   // A filter combination nothing matches is a real page that should not be indexed;
   // `pageExists` already 404s a page number past the end, so this only ever fires on
   // page 1 of an empty result set.
   const robots = $derived(listingRobots(data.initial.total));
   // The number belongs in the title too, or every page advertises itself as the same
-  // one. Mirrors the job feed. Page 1 leads with the live count and the subject —
-  // see companiesPageTitle for why the bare "Companies · freehire" was a waste.
+  // one. Mirrors the job feed. Page 1 leads with the live count and the subject.
   const title = $derived(
     data.pageNumber > 1
-      ? `Companies — page ${data.pageNumber} · freehire`
+      ? `Companies — page ${data.pageNumber} · Job Searcher`
       : companiesPageTitle(data.initial.total)
   );
   // Structured data for the directory: a CollectionPage wrapping the server-rendered
-  // first page of companies as an ItemList, plus a breadcrumb (freehire → Companies),
+  // first page of companies as an ItemList, plus a breadcrumb,
   // mirroring the collection landings. The list follows the active filters, so a
   // deep-linked filtered URL describes what it actually shows.
   const jsonLd = $derived(
     jsonLdScript([
       collectionPageJsonLd(
-        'Companies hiring in tech',
+        'Companies with open jobs',
         description,
         canonical,
         companyListItems(data.initial.items, origin)
       ),
       breadcrumbJsonLd([
-        { name: 'freehire', url: `${origin}/` },
+        { name: 'Job Searcher', url: `${origin}/` },
         { name: 'Companies', url: canonical },
       ]),
     ])
@@ -67,6 +66,6 @@
   <!-- Primary heading kept for search engines and assistive tech, but visually
        hidden: the list and filters make the page's purpose clear, so the on-screen
        title was redundant. sr-only takes no layout space. Mirrors /jobs. -->
-  <h1 class="sr-only">Companies hiring in tech</h1>
+  <h1 class="sr-only">Companies with open jobs</h1>
   <CompaniesView initial={data.initial} currentPage={data.pageNumber} />
 </div>

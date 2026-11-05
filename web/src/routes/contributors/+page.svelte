@@ -98,28 +98,4 @@
     </div>
   </section>
 
-  <section class="rounded-xl border border-border bg-muted/30 p-6 sm:p-8">
-    <h2 class="text-xl font-semibold tracking-tight">Your name goes here next.</h2>
-    <p class="mt-2 max-w-2xl text-muted-foreground">
-      An opened issue counts as much as merged code. Pick something that annoys you about freehire
-      and tell us, or fix it.
-    </p>
-    <div class="mt-5 flex flex-wrap gap-3">
-      <a
-        href={resolve('/contribute')}
-        class="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
-      >
-        How to contribute
-      </a>
-      <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external repository, not a SvelteKit route -->
-      <a
-        href="https://github.com/strelov1/freehire/issues"
-        class="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-background"
-        rel="noopener"
-        target="_blank"
-      >
-        Open an issue ↗
-      </a>
-    </div>
-  </section>
 </div>

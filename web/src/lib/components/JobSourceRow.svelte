@@ -1,12 +1,7 @@
 <script lang="ts">
-  import { Ban, RotateCcw } from '@lucide/svelte';
-  import { isAuthenticated } from '#lib/auth.svelte.js';
   import { sourceLabel } from '#lib/facets.js';
   import { filterHref } from '#lib/enrichment.js';
   import { SOURCE_LOGO_DOMAINS, sourceLogoUrl } from '#lib/logo.js';
-  import { profileStore } from '#lib/profile.svelte.js';
-  import { syncProfileAlert } from '#lib/profileAlertSync.js';
-  import { promptSignIn } from '#lib/signin.js';
   import { Badge, EntityLogo } from '#lib/ui/index.js';
   import AdzunaAttribution from './AdzunaAttribution.svelte';
   import DevGlobalJobsAttribution from './DevGlobalJobsAttribution.svelte';
@@ -22,41 +17,6 @@
   }: { source: string; jobUrl: string; manuallyAdded?: boolean } = $props();
 
   const label = $derived(sourceLabel(source));
-
-  // Compared lowercased: the server normalises excluded_sources to lowercase on save
-  // (userprofile.normalizeExcludedSet), and nothing guarantees a caller hands us the same
-  // casing the list was written in.
-  const avoided = $derived(
-    (profileStore.profile?.excluded_sources ?? []).some(
-      (s) => s.toLowerCase() === source.toLowerCase()
-    )
-  );
-
-  let pending = $state(false);
-  let failed = $state(false);
-
-  // The write goes to the PROFILE, not to this job: a source is a crawl adapter serving
-  // thousands of postings, so avoiding one means "stop showing me anything from
-  // SmartRecruiters" — the same scope the profile's own "Sources to avoid" card has. The
-  // shape mirrors JobMatch's skill avoid, down to re-syncing the saved-search alert, which
-  // is the only way the exclusion reaches a digest.
-  async function setAvoided(avoid: boolean) {
-    if (pending) return;
-    if (!isAuthenticated()) {
-      promptSignIn();
-      return;
-    }
-    pending = true;
-    failed = false;
-    try {
-      await (avoid ? profileStore.avoidSource(source) : profileStore.unavoidSource(source));
-      void syncProfileAlert();
-    } catch {
-      failed = true;
-    } finally {
-      pending = false;
-    }
-  }
 </script>
 
 <div
@@ -93,30 +53,5 @@
 
   {#if manuallyAdded}
     <Badge variant="secondary">Manually added</Badge>
-  {/if}
-
-  <!-- Hidden from signed-out readers, who have no profile to write to. -->
-  {#if isAuthenticated()}
-    <button
-      type="button"
-      disabled={pending}
-      onclick={() => setAvoided(!avoided)}
-      title={avoided
-        ? `Show ${label} postings again`
-        : `Hide every ${label} posting from your search and alerts`}
-      class="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-muted-foreground/40 disabled:opacity-50"
-    >
-      {#if avoided}
-        <RotateCcw class="size-3.5" aria-hidden="true" /> Stop avoiding
-      {:else}
-        <Ban class="size-3.5" aria-hidden="true" /> Avoid this source
-      {/if}
-    </button>
-  {/if}
-
-  {#if failed}
-    <!-- An alert, so the failure is announced: the button that caused it does not move
-         focus, and a screen reader user would otherwise hear nothing at all. -->
-    <span role="alert" class="text-destructive">Could not save that — try again.</span>
   {/if}
 </div>

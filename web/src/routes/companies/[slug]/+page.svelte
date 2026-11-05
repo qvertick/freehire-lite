@@ -74,7 +74,6 @@
       initial={data.initial}
       slug={data.slug}
       currentPage={data.pageNumber}
-      referralAvailable={data.referralAvailable}
       parent={data.parent}
       subsidiaries={data.subsidiaries}
     />

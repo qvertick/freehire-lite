@@ -1,6 +1,5 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { resolve } from '$app/paths';
   import Seo from '#lib/components/Seo.svelte';
 
   const repoUrl = 'https://github.com/strelov1/freehire';
@@ -15,7 +14,7 @@
 
 <Seo
   title="Terms of Service — freehire"
-  description="The terms for using freehire, the open-source IT job aggregator: your account, acceptable use, job listings, AI features, and liability."
+  description="The terms for using freehire, the open-source job aggregator: acceptable use, job listings, data, and liability."
   {canonical}
 />
 
@@ -33,7 +32,7 @@
       freehire (<a
         href="https://freehire.me"
         class="font-medium text-foreground underline-offset-4 hover:underline">freehire.me</a
-      >), including our mobile app, is a free, open-source IT job aggregator. By using it, you
+      >) is a free, open-source job aggregator. By using it, you
       agree to these terms.
     </p>
 
@@ -46,33 +45,16 @@
       <h2 class="text-xl font-semibold tracking-tight">The service</h2>
       <p class="text-sm leading-relaxed text-muted-foreground">
         We aggregate job postings from public company career boards and other public sources,
-        normalise and deduplicate them, and let you search, filter, save, and track them. We also
-        offer optional AI features — CV matching and match analysis — that you choose to run.
-      </p>
-    </section>
-
-    <section class="flex flex-col gap-3">
-      <h2 class="text-xl font-semibold tracking-tight">Your account</h2>
-      <p class="text-sm leading-relaxed text-muted-foreground">
-        You're responsible for the activity on your account and for keeping your credentials
-        secure. You can delete your account at any time from account settings, or from the app —
-        see <a
-          href={resolve('/delete-account')}
-          class="font-medium text-foreground underline-offset-4 hover:underline">Account Deletion</a
-        > for how.
+        normalise and deduplicate them, and let you search and filter the resulting catalogue.
       </p>
     </section>
 
     <section class="flex flex-col gap-3">
       <h2 class="text-xl font-semibold tracking-tight">Acceptable use</h2>
       <p class="text-sm leading-relaxed text-muted-foreground">
-        Don't misuse the service: no scraping beyond our documented API (and within it, the data
-        licence below), no attempting to bypass rate limits or authentication, no uploading unlawful content, and no using the service to
-        harass or defraud anyone. We may suspend or terminate accounts that violate this.
-      </p>
-      <p class="text-sm leading-relaxed text-muted-foreground">
-        In interview buddies, don't send spam, harass or threaten members, or use chat to scam
-        people. You can block or report a conversation.
+        Don't misuse the service: respect rate limits, don't interfere with its operation, don't
+        use it to violate the law or harm others, and don't republish third-party job data unless
+        you have permission from its rights holder.
       </p>
     </section>
 
@@ -86,36 +68,11 @@
     </section>
 
     <section id="data-licence" class="flex scroll-mt-20 flex-col gap-3">
-      <h2 class="text-xl font-semibold tracking-tight">Data licence for API plans</h2>
+      <h2 class="text-xl font-semibold tracking-tight">Data and API use</h2>
       <p class="text-sm leading-relaxed text-muted-foreground">
-        While your account holds an
-        <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- resolve() is applied; the rule cannot see through the appended section anchor -->
-        <a href={resolve('/pricing') + '#api'} class="font-medium text-foreground underline-offset-4 hover:underline"
-          >API plan</a
-        >, you may store the data you read through our API and show it in your own product,
-        including a commercial one. You may also keep a history of it for analysis over time and
-        use it to build, train and evaluate statistical or machine-learning models. You may not
-        resell or redistribute the raw data — as a download, a dataset, or an API or feed whose
-        purpose is to hand the postings on to other services. When the plan ends, stop
-        showing the postings in your product; you may keep what you stored for your own internal
-        analysis. What you derived from the data — aggregated figures, trends, indicators and the
-        models you trained — stays yours, and you may keep using it, commercially too, as long as
-        it does not reproduce the postings themselves.
-      </p>
-      <p class="text-sm leading-relaxed text-muted-foreground">
-        Without a plan, the API is for personal and non-commercial use — your own job search,
-        research, or a tool you run for yourself. Showing our postings in a product or service
-        you offer to others, paid or not, needs a plan. The postings themselves still belong to
-        the employers who published them, and these terms do not grant rights an employer or
-        original source has not given us.
-      </p>
-    </section>
-
-    <section class="flex flex-col gap-3">
-      <h2 class="text-xl font-semibold tracking-tight">AI features</h2>
-      <p class="text-sm leading-relaxed text-muted-foreground">
-        Features like match analysis and CV matching use a language model and can be wrong. They're
-        a research aid, not career or legal advice — use your own judgment before acting on them.
+        The API is a read-only way to search the catalogue and is subject to rate limits. Job
+        descriptions and other source material remain the property of their respective publishers.
+        These terms do not grant rights that a publisher or original source has not given us.
       </p>
     </section>
 

@@ -8,7 +8,6 @@
 //
 // Pure by design: no Svelte, no DOM, no network.
 
-import type { PastedJobLink } from './jobLink';
 import type { OperatorOption } from './searchOperators';
 import type { Suggestion } from './suggestions';
 import type { Job, CompanyListItem } from './types';
@@ -21,7 +20,6 @@ export type DropdownRow = { key: string; first: boolean } & (
   | { kind: 'job'; job: Job }
   | { kind: 'company'; company: CompanyListItem }
   | { kind: 'text'; text: string }
-  | { kind: 'link'; link: PastedJobLink }
   | { kind: 'operator'; option: OperatorOption }
 );
 
@@ -69,9 +67,6 @@ export interface DropdownContent {
   /** What is typed in the box. Empty means no free-text row: there is nothing to
    *  offer searching for. */
   text: string;
-  /** The link recognised in `text`, when it is one. Set means the panel offers exactly
-   *  one thing — see below. */
-  link?: PastedJobLink | null;
   /** The options for the operator the caret is in (`company:goo`). Set means the
    *  panel offers only these — see below. */
   operator?: readonly OperatorOption[] | null;
@@ -82,15 +77,6 @@ export interface DropdownContent {
  *  A section with nothing in it contributes no rows at all, so an empty postings
  *  section leaves no gap in the numbering and no orphan heading. */
 export function dropdownRows(content: DropdownContent): DropdownRow[] {
-  // A pasted link REPLACES the panel rather than joining it. The other sections are
-  // answers to a full-text search, and a URL is not text anybody wrote to be searched
-  // for: the completions come back empty, the postings section matches on stray path
-  // fragments, and the free-text row offers to run a search that finds nothing. One row
-  // that does the one useful thing is the whole panel here.
-  if (content.link) {
-    return [{ kind: 'link', link: content.link, key: 'l', first: true }];
-  }
-
   // Inside an operator's value the visitor is choosing ONE kind of thing, so the
   // panel is that kind alone. The free-text row goes too: it would search the
   // half-typed `company:goo` as words. No match is an empty panel, not the ordinary

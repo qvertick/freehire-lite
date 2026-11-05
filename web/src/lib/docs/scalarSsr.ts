@@ -1,4 +1,4 @@
-// Shared by both /docs/api and /docs/api/internal's +page.server.ts: plain JSON in
+// Shared by /docs/api's +page.server.ts: plain JSON in
 // (a generated OpenAPI document), Scalar SSR HTML fragment out. The client hydrates
 // the same fragment with the same config (see scalarConfig.ts), so the two never
 // disagree about what the spec says.

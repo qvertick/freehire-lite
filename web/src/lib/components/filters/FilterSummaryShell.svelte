@@ -22,7 +22,7 @@
 </script>
 
 <script lang="ts">
-  import { tick, type Snippet } from 'svelte';
+  import { tick } from 'svelte';
   import { SlidersHorizontal, X } from '@lucide/svelte';
   import SkillIcon from '../SkillIcon.svelte';
 
@@ -37,7 +37,6 @@
     onReset,
     onOpen,
     description,
-    afterButton,
   }: {
     groups: SummaryGroup[];
     active: number;
@@ -46,9 +45,6 @@
     /** Optional caption under the "Filters" heading, explaining what refining does in
      *  this context — the Market coverage tab uses it; other summaries omit it. */
     description?: string;
-    /** Optional content under the All-filters button — the job summary uses it for the
-     *  "Save filter" affordance; the company summary omits it. */
-    afterButton?: Snippet;
   } = $props();
 
   let root = $state<HTMLDivElement>();
@@ -114,7 +110,6 @@
     {/if}
   </button>
 
-  {@render afterButton?.()}
 
   {#if groups.length === 0}
     <div class="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">

@@ -12,17 +12,11 @@
   import { countryLabel } from '#lib/facets.js';
   import { emptyFilters, filtersToParams } from '#lib/facetModel.js';
   import type { StagedFilters } from '#lib/stagedFilters.svelte.js';
-  import { EXTENSION_FIREFOX_URL, EXTENSION_STORE_URL } from '#lib/extensionLinks.js';
-  import ExtensionPanelPreview from './ExtensionPanelPreview.svelte';
   import { starterSuggestions } from '#lib/suggestions.js';
-  import { Button, ProviderIcon, SectionLabel } from '#lib/ui/index.js';
-  import McpSetup from './McpSetup.svelte';
-  import ChatExample from './ChatExample.svelte';
+  import { SectionLabel } from '#lib/ui/index.js';
   import type { CatalogScale, FacetCounts } from '#lib/types.js';
 
-  // The homepage. One search box on an otherwise empty screen, and under it — for the
-  // visitor who came to look rather than to search — how big the catalogue is and the
-  // two places freehire runs that are not this page.
+  // The homepage centers on the search box and current catalogue data.
   //
   // The box is the header's own search component at hero size. On a page with no list
   // registered, that component already drives a target that turns every pick into a
@@ -31,10 +25,7 @@
   // the landing owns none of that behaviour. The header renders no box on this route
   // (see TopBar): one screen, one field.
   //
-  // Everything below the fold is a POINTER, not a second copy of a page that exists:
-  // /open owns the numbers, /cli owns the CLI, /features/extension owns the extension.
-  // Each section here says the one sentence that makes someone click, and the copy is
-  // lifted verbatim from the page it leads to rather than written again.
+  // Catalogue numbers and facet shortcuts come from the same API data as the search.
   let {
     counts,
     scale,
@@ -74,10 +65,8 @@
     return planHref({ facets: [[param, value]] });
   }
 
-  /** What, rather than where: the starting points in the curated group order the filter
-   *  modal uses — Engineering first, the consumer industries last. Built by the same
-   *  function the dropdown's empty state uses, from the same distribution, and turned
-   *  into a link by the same `planForSuggestion` the dropdown applies — so which facet
+  /** What, rather than where: the most common categories in the same distribution the
+   *  dropdown's empty state uses. Each becomes a link through `planForSuggestion` — so which facet
    *  a craft means is answered in one place, not two. */
   const crafts = $derived<Chip[]>(
     starterSuggestions(counts, CHIP_LIMIT).map((s) => ({
@@ -93,17 +82,24 @@
    *
    *  Unlike the crafts there is no curated order to honour: a country's only claim on
    *  the row is how much work is in it. */
-  const places = $derived<Chip[]>([
-    { href: feedHref('work_mode', 'remote'), label: 'Remote' },
-    ...Object.entries(counts?.facets?.countries ?? {})
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, COUNTRY_CHIP_LIMIT)
-      .map(([code, count]) => ({
+  const places = $derived.by<Chip[]>(() => {
+    const countries = Object.entries(counts?.facets?.countries ?? {}).sort(
+      ([, a], [, b]) => b - a,
+    );
+    const poland = countries.find(([code]) => code.toUpperCase() === 'PL');
+    const otherCountries = countries
+      .filter(([code]) => code !== poland?.[0])
+      .slice(0, COUNTRY_CHIP_LIMIT - Number(poland !== undefined));
+
+    return [
+      { href: feedHref('work_mode', 'remote'), label: 'Remote' },
+      ...[...(poland ? [poland] : []), ...otherCountries].map(([code, count]) => ({
         href: feedHref('countries', code),
         label: countryLabel(code),
         count,
       })),
-  ]);
+    ];
+  });
 
   type Figure = { value: string; label: string };
 
@@ -221,11 +217,11 @@
          it said anything. -->
     <div class="flex flex-col items-center gap-5 text-center">
       <h1 class="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-        Every tech job, straight from the source.
+        Find your next job. All in one place.
       </h1>
       <p class="text-balance text-base leading-relaxed text-muted-foreground">
-        Indexed from company career boards, deduplicated, and tagged by stack, seniority
-        and location. Free, open source, no walls.
+        Search vacancies from multiple job platforms, with a focus on Poland. Compare
+        listings in one place, then continue to the original posting.
       </p>
     </div>
 
@@ -257,15 +253,13 @@
     </div>
 
     {#if crafts.length > 0}
-      {@render chipRow('Biggest specializations', crafts)}
+      {@render chipRow('Popular job categories', crafts)}
     {/if}
     {#if places.length > 1}
-      <!-- Only with real countries behind it: Remote alone is a row that looks like a
-           measurement and is a constant. -->
-      {@render chipRow('Locations', places)}
+      {@render chipRow('Popular locations', places)}
     {/if}
 
-    {@render onward(resolve('/jobs'), 'See every specialization and location in the catalogue')}
+    {@render onward(resolve('/jobs'), 'Browse all vacancies')}
   </div>
 </section>
 
@@ -297,61 +291,6 @@
 {/if}
 
 <RecentJobsFeed />
-
-<!-- The two places freehire runs that are not a web page. Side by side because they
-     are the same offer twice — the catalogue where you already work — and stacking
-     them would make the second read as an afterthought. Each card carries its own
-     evidence: the CLI its install line, the extension what the panel actually does. -->
-<section class="border-t border-border py-12 sm:py-16">
-  <SectionLabel as="h2" text="take it with you" />
-  <!-- `grid-cols-1` is load-bearing, not the default written out: with no column template
-       the single track below `lg` is `auto`, which sizes to its widest content — the
-       install line in the `pre`, which does not wrap. That took the track to 416px on a
-       390px phone and gave the whole page a horizontal scrollbar. Tailwind's `grid-cols-*`
-       are `repeat(N, minmax(0, 1fr))` for exactly this, and the `pre` scrolls itself. -->
-  <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-    <div class="flex flex-col gap-5 rounded-xl border border-border p-6 sm:p-8">
-      <h3 class="text-2xl font-semibold tracking-tight">Search and track from your AI assistant.</h3>
-      <p class="text-sm leading-relaxed text-muted-foreground">
-        Add freehire to your assistant and ask for jobs in plain words.
-      </p>
-      <div class="[zoom:0.8]"><ChatExample /></div>
-      <McpSetup iconsOnly />
-
-      <div class="mt-auto flex flex-wrap items-center justify-end gap-3">
-        <Button href={resolve('/mcp')} variant="cta" size="md" class="group">
-          Connect your assistant
-          <ArrowRight class="size-4 transition-transform group-hover:translate-x-1" />
-        </Button>
-        <Button href={resolve('/cli')} variant="ghost" size="md">CLI docs</Button>
-      </div>
-    </div>
-
-    <div class="flex flex-col gap-5 rounded-xl border border-border p-6 sm:p-8">
-      <div class="flex flex-col gap-3">
-        <h3 class="text-2xl font-semibold tracking-tight">Apply where you already are.</h3>
-        <p class="text-sm leading-relaxed text-muted-foreground">
-          A job-application agent in Chrome's side panel, next to the posting you are
-          reading — on any site, not just the ones freehire tracks.
-        </p>
-      </div>
-
-      <!-- The same preview as /features/extension, drawn smaller: `zoom` shrinks the layout box too, unlike a transform. -->
-      <div class="[zoom:0.7]"><ExtensionPanelPreview /></div>
-
-      <div class="mt-auto flex flex-wrap items-center justify-end gap-3">
-        <Button href={EXTENSION_STORE_URL} target="_blank" variant="primary" size="md">
-          <ProviderIcon provider="chrome" class="size-4" />
-          Add to Chrome
-        </Button>
-        <Button href={EXTENSION_FIREFOX_URL} target="_blank" variant="outline" size="md">
-          <ProviderIcon provider="firefox" class="size-4" />
-          Add to Firefox
-        </Button>
-      </div>
-    </div>
-  </div>
-</section>
 
 <!-- Seeded empty and applied by navigating: see `searchWithFilters`. `savedSearches`
      is off — that tab manages the alerts a signed-in visitor saved from a list, and

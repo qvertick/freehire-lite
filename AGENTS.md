@@ -58,15 +58,14 @@ Non-obvious:
 - Dead **Go** code: `deadcode -test -tags=integration,llmlive ./...` (the `dead-code-go` CI job), which builds the whole call graph and reports what no binary and no test can reach. **Both flags are load-bearing.** Without the tags it does not parse the build-tagged tests and calls their helpers dead — the same blindness `.golangci.yml`'s `run.build-tags` documents for depguard. Without `-test` every test-only helper is dead. The residue it cannot see is a function whose only caller is its own test; that one still needs a reviewer. To run it locally: `go install golang.org/x/tools/cmd/deadcode@v0.52.0` — with a toolchain at least as new as go.mod's `go` directive, or the binary's type checker rejects the module and reports "package requires newer Go version" instead of findings.
 - `.github/workflows/` — linted by `actionlint` (the `workflows` CI job), which also runs shellcheck over every `run:` block, and audited by `zizmor --offline` in the same job. Every `uses:` is pinned to a commit SHA with a `# vX.Y.Z` comment, which Dependabot moves together; a new action goes in the same way or zizmor fails. `actions/checkout` takes `persist-credentials: false` unless a later step pushes. A finding wrong for one line carries `# zizmor: ignore[<audit>]` with the reason beside it. Nothing else reads a workflow until GitHub runs it, so a mistake in one that fires on a tag or a schedule surfaces late.
 - **The instruction files are linted** by `agnix --strict` (the `docs` CI job): an unclosed code fence turns the rest of an AGENTS.md into one code block, and that is invisible to a reader skimming the rendered file. `.agnix.toml` argues every rule it turns off.
-- **The public API contract is checked against main.** `scripts/check-openapi-breaking.sh` (the `api-breaking` CI job) runs oasdiff over `web/static/openapi.yaml` and fails on a change that would break an existing client — a removed field, a narrowed bound, a weaker response promise. A deliberate break passes with an `API-Break: <reason>` commit trailer.
+- **The public Job Searcher API contract is checked against main.** `scripts/check-openapi-breaking.sh` (the `api-breaking` CI job) runs oasdiff over `web/static/openapi.yaml` and fails on a change that would break an existing client — a removed field, a narrowed bound, a weaker response promise. A deliberate break passes with an `API-Break: <reason>` commit trailer.
 - **The links in these documents are checked.** `pnpm check:links` (the `docs` CI job and a pre-commit hook) resolves every relative Markdown link in the repository. The table below is the map an agent is meant to follow, so a link that no longer resolves does not just fail — it sends the reader somewhere confidently. The hook carries no glob on purpose: what breaks a link is renaming its **target**, usually a `.go` or `.svelte` file.
 - **What we hand to someone else is linted too** (the `artifacts` CI job): `web/static/install.sh` is served at `freehire.me/install.sh` to be piped into `sh`, so shellcheck covers every tracked `*.sh`; both Dockerfiles go through hadolint (`.hadolint.yaml` argues its two exclusions, and a finding wrong for one line carries `# hadolint ignore=` beside it); and `web/static/openapi.yaml` is validated against the OpenAPI specification, since it is a static asset nothing else parses.
 - **There is no `sources/` directory.** The board catalog is the `boards` table (`internal/ingest/boardcatalog`) and the Telegram channel list is `telegram_channels` — both moved out of YAML, and nothing in the repository parses a board file any more. `internal/ingest/sources` is the *adapters*, not the catalog.
-- `design-system/` — a separate pnpm package, sibling to `web/` and `extension/`, linked via
-  pnpm's `link:../design-system` (`web/`) or npm's `file:../design-system` (`extension/`) — both
-  are symlinks, not copies. **Install it before building either consumer** — neither package
-  manager installs a linked/`file:` package's own dependencies for you. Being a symlink also
-  means each of the three installs its OWN `node_modules`, so a package all of them depend on
+- `design-system/` — a separate pnpm package, sibling to `web/`, linked via
+  pnpm's `link:../design-system` — a symlink, not a copy. **Install it before building web/** —
+  pnpm does not install a linked package's own dependencies for you. Being a symlink also
+  means each package installs its OWN `node_modules`, so a package both depend on
   sits on disk more than once — free for a value, fatal for a TYPE, since TypeScript
   identifies a type by where it was declared and two copies of `LucideIcon` are two unrelated
   types sharing a name. `pnpm check:deps` (`scripts/check-shared-deps.mjs`, the `shared-deps`
@@ -79,8 +78,6 @@ Non-obvious:
   than what it develops against. Dependabot cannot see any of this: it reads three
   `package.json` files as three unrelated projects, so it will keep proposing a bump to one of
   them, and that PR is correct once the other two move with it.
-- `extension/` — the browser extension (WXT + Svelte side-panel agent client), npm-managed
-  unlike the rest of the JS in this repo. See [extension/AGENTS.md](extension/AGENTS.md).
 - `internal/platform/db/` — **generated**; edit `internal/platform/db/queries/*.sql` and run `make sqlc`. The pre-commit hook and the `sqlc` CI job regenerate and diff, so a query edited without regenerating no longer ships the old Go with every check green. Both use `make sqlc`, which holds the only version pin — a second pin would be a second answer, and the drift between them would look exactly like stale code.
 - `services/pii-filter` — a standalone service, not a Go package.
 - **There is no `deploy/` snapshot of the host any more.** The systemd units, the nginx
@@ -120,7 +117,7 @@ suite when the commit has no Go. Integration-tagged tests stay push-time (`go ve
 
 **Pre-commit hooks:** [lefthook](https://github.com/evilmartians/lefthook) (`go install
 github.com/evilmartians/lefthook@latest`, then `lefthook install` once per clone) runs
-gofmt/vet/golangci-lint on staged Go files and eslint on staged files in web/, extension/,
+gofmt/vet/golangci-lint on staged Go files and eslint on staged files in web/ and
 design-system/ — the same ratchet policy as CI (only new issues fail the commit), so it
 won't block on the pre-existing backlog.
 
@@ -188,7 +185,6 @@ Each is self-contained and can be read independently.
 | Area | Reference |
 |---|---|
 | **System architecture** (the high-level map: topology, repo layout, the three main flows) — start here | [docs/architecture.md](docs/architecture.md) |
-| **Browser extension** (WXT + Svelte side-panel agent client, the other end of Browser tools) | [extension/AGENTS.md](extension/AGENTS.md) |
 | **Company identity** (the company slug rule, the alias registry, the merge worker) | [docs/agents/company-identity.md](docs/agents/company-identity.md) |
 | **Mail stack** (Gmail + SES inbound → classify → link → stage advance) | [docs/agents/mail-stack.md](docs/agents/mail-stack.md) |
 | **Notifications** (subscription digests, saved-job reminders, channels) | [docs/agents/notifications.md](docs/agents/notifications.md) |

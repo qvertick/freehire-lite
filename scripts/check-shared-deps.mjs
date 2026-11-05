@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Checks that `web/`, `design-system/` and `extension/` agree on the version of every
-// package whose TYPES cross the boundary between them.
+// Checks that `web/` and `design-system/` agree on the version of every package whose
+// TYPES cross the symlink boundary between them.
 //
 // `design-system/` is consumed as a symlink, not a copy — pnpm's `link:../design-system`
-// from `web/`, npm's `file:../design-system` from `extension/`. Each package therefore
-// installs its own `node_modules`, and a package depended on by both ends up on disk twice.
+// from `web/`. Each package therefore installs its own `node_modules`, and a package
+// depended on by both ends up on disk twice.
 // For a value that costs a few kilobytes. For a TYPE it costs correctness: TypeScript
 // identifies a type by where it was declared, so `LucideIcon` from the design system's copy
 // and `LucideIcon` from the consumer's copy are two unrelated types that happen to share a
@@ -13,7 +13,7 @@
 // Found the hard way (freehire#2835, #2836): Dependabot raised `@lucide/svelte` in
 // `design-system/` alone, 1.45 widened the `name` prop to admit `null`, and `svelte-check`
 // reported eight errors in `web/` about a type being unassignable to itself. Dependabot
-// cannot prevent this — it reads three package.json files as three unrelated projects and
+// cannot prevent this — it reads package.json files as unrelated projects and
 // has no way to know one is symlinked into the others.
 //
 // The scope is DERIVED, not listed: whatever the design system imports as a type today is
@@ -25,7 +25,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-const CONSUMERS = ['web', 'extension'];
+const CONSUMERS = ['web'];
 const LIBRARY = 'design-system';
 
 /**

@@ -2,21 +2,23 @@ import { describe, it, expect } from 'vitest';
 import { starterSuggestions } from './suggestions';
 import type { FacetCounts } from './types';
 
-// What an empty search box offers. The point is to answer "I don't know what I can
-// type here", so the list has to show the SHAPE of the catalogue rather than its
-// biggest buckets — measured on production those were Management (266,883, a category
-// since retired), Sales (179,993) and Support (127,110), which read as a different
-// website to someone who came for engineering work.
+// What an empty search box offers: the most common categories actually present in the
+// measured catalogue, including non-IT roles.
 
 const counts = (category: Record<string, number>): FacetCounts =>
   ({ total: 0, facets: { category } }) as unknown as FacetCounts;
 
 describe('starterSuggestions', () => {
-  it('leads with engineering, not with the biggest bucket', () => {
+  it('ranks measured categories by popularity across industries', () => {
     const got = starterSuggestions(
       counts({ healthcare: 266883, sales: 179993, backend: 8000, software_engineering: 89465 }),
     );
-    expect(got[0]?.slug).toBe('software_engineering');
+    expect(got.map((suggestion) => suggestion.slug)).toEqual([
+      'healthcare',
+      'sales',
+      'software_engineering',
+      'backend',
+    ]);
   });
 
   it('spans the groups instead of spending every row on engineering', () => {
@@ -35,7 +37,7 @@ describe('starterSuggestions', () => {
     expect(slugs).toContain('product');
   });
 
-  it('takes the busiest category of each group as its representative', () => {
+  it('uses the measured count rather than the curated group order', () => {
     const got = starterSuggestions(counts({ backend: 8000, software_engineering: 89465 }));
     expect(got[0]?.slug).toBe('software_engineering');
   });
@@ -67,17 +69,12 @@ describe('starterSuggestions', () => {
     expect(got.map((s) => s.slug)).not.toContain('other');
   });
 
-  it('puts the consumer industries last', () => {
+  it('includes consumer categories when they are among the most common', () => {
     const got = starterSuggestions(counts({ healthcare: 77787, backend: 8000 }));
-    expect(got.map((s) => s.slug)).toEqual(['backend', 'healthcare']);
+    expect(got.map((s) => s.slug)).toEqual(['healthcare', 'backend']);
   });
 
-  // The curated group order is a priority, not just a sequence: Engineering, Data &
-  // AI, Quality & Security and Design & Creative come first because that is who this
-  // catalogue is for. Taking one per group flattens that priority — measured against
-  // production it spent half the list on Management, Sales, HR, Operations and
-  // Healthcare. Two per group spends the ten rows on the groups that lead.
-  it('gives each leading group two rows before reaching a later one', () => {
+  it('returns the ten most common measured categories across the catalogue', () => {
     const got = starterSuggestions(
       counts({
         software_engineering: 89598, devops: 53313,
@@ -90,19 +87,22 @@ describe('starterSuggestions', () => {
     );
     const slugs = got.map((s) => s.slug);
     expect(slugs).toEqual([
-      'software_engineering', 'devops',
-      'data_analytics', 'data_engineering',
-      'security', 'qa',
-      'design', 'creative',
-      'project_management', 'product',
+      'sales',
+      'software_engineering',
+      'healthcare',
+      'data_analytics',
+      'security',
+      'project_management',
+      'product',
+      'devops',
+      'data_engineering',
+      'design',
     ]);
-    expect(slugs).not.toContain('sales');
-    expect(slugs).not.toContain('healthcare');
   });
 
-  it('moves on when a leading group cannot fill its two rows', () => {
+  it('preserves the popularity ranking when fewer than the default rows are available', () => {
     const got = starterSuggestions(counts({ backend: 8000, design: 40023, creative: 9000 }));
-    expect(got.map((s) => s.slug)).toEqual(['backend', 'design', 'creative']);
+    expect(got.map((s) => s.slug)).toEqual(['design', 'creative', 'backend']);
   });
 
   it('offers nothing at all when nothing has been measured yet', () => {

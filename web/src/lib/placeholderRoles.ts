@@ -26,12 +26,12 @@ export const ROLE_PREFIX = 'Search jobs: ';
  *  entry is the only one anyone sees and carries the whole weight of answering "what can
  *  I type here". Six is about what a visitor will sit through before typing. */
 export const PLACEHOLDER_ROLES: Category[] = [
-  'backend',
-  'frontend',
-  'devops',
-  'qa',
-  'data_science',
-  'product',
+  'healthcare',
+  'skilled_trades',
+  'retail',
+  'logistics',
+  'software_engineering',
+  'finance',
 ];
 
 /** The fixed prefix and animated role examples for the homepage search box. */

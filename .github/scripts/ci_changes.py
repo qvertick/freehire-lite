@@ -48,11 +48,11 @@ def classify(paths):
             backend = True
             # PlanView.test.ts reads the Go feature vocabulary directly.
             web = web or path.startswith("internal/ai/plan/")
-        elif path in ("docs/API.md", "docs/API.internal.md"):
-            # These are generated and verified by the web job.
+        elif path == "docs/API.md":
+            # The public API reference is generated and verified by the web job.
             web = True
-        elif path.startswith(("docs/", "openspec/", "extension/")):
-            # Go unit guards still inspect promo documents and extension fixtures.
+        elif path.startswith(("docs/", "openspec/")):
+            # Go unit guards still inspect promo documents.
             continue
         elif "/" not in path and path.endswith(".md"):
             continue

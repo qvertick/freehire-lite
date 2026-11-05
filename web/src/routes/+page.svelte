@@ -17,8 +17,8 @@
 </script>
 
 <Seo
-  title="freehire — the open-source search engine for tech jobs"
-  description="Search 3M+ tech jobs indexed straight from company career boards — deduplicated and tagged by stack, seniority and location. Free, open source, no walls."
+  title="Job Searcher — find your next job in one place"
+  description="Search vacancies from multiple job platforms in one place, with a focus on the Polish job market."
   canonical="{origin}/"
 />
 

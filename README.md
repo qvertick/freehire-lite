@@ -70,41 +70,21 @@ what [freehire.me/jobs](https://freehire.me/jobs?utm_source=github&utm_medium=re
 
 ## Free and Pro
 
-[freehire.me](https://freehire.me/?utm_source=github&utm_medium=readme&utm_campaign=plans) is free for finding and tracking a job,
-for good: every posting and every filter, AI search, alerts by email, Telegram and
-push, the application board, the inbox that sorts employer replies, and search from
-ChatGPT, Claude or any agent over MCP.
-
-**Pro — $5/month** adds the AI that does the applying with you:
-
-- **CV tailoring for each vacancy**, with a cover letter — it invents nothing
-- **The AI assistant**, unlimited
-- **The browser extension fills application forms** for you
-- **Auto-apply in the background**, within a daily limit
-- Members-only channels on the community Discord
-
-Cancel any time; not what you expected — email within 14 days for a refund.
-**[See plans →](https://freehire.me/pricing?utm_source=github&utm_medium=readme&utm_campaign=plans)**
+[freehire.me](https://freehire.me/) is a public job search engine. Search and filter
+IT and non-IT vacancies from multiple sources, then follow the original posting to
+apply directly with the employer.
 
 > If freehire saves you time — or you just like the idea of jobs straight from the
 > source — a ⭐ helps other people find it.
 
-## Beyond the catalogue
-
-Finding the posting is half the problem. The other half — writing the CV,
-sending it, and knowing what happened to it — is built on the same data, in the
-same repository, under the same licence.
+## How it works
 
 | | |
 | --- | --- |
-| **Find** | Faceted search, curated collections, saved searches with email/Telegram digests, shared boards, market analytics, the ghost-job signal |
-| **Apply** | CV builder with ATS-safe PDF templates, deterministic CV↔vacancy scoring, AI fit analysis, CV tailoring that invents nothing, tracer links, referrals |
-| **Track** | An application board with stages, a mail inbox that links recruiter replies to the application they answer, an append-only event ledger, reminders |
-| **Ask** | An in-process agent with five presets — chat, browse, profile, CV tailoring, interview rehearsal — with no shell and no minted credential |
-| **Build on** | A keyless public API, a [CLI](https://github.com/strelov1/freehire-cli), an [MCP server](https://github.com/strelov1/freehire-mcp) for Claude Desktop and Claude Code, a form-filling browser extension, ChatGPT Actions |
-
-**[Full feature reference → `docs/features.md`](docs/features.md)** — what each one
-does, where it lives in the tree, and which need an LLM endpoint configured.
+| **Collect** | Source adapters fetch vacancies and refresh their status |
+| **Normalize** | A shared pipeline maps source data to one job schema and deduplicates postings |
+| **Search** | PostgreSQL stores the catalogue; Meilisearch serves keyword search, filters and sorting |
+| **Browse** | A public frontend presents job and company pages with links to the original postings |
 
 ## Stack
 
@@ -193,13 +173,11 @@ hard-deletes jobs; the lifecycle only soft-closes them.
 cmd/                 entry points: server + the standalone workers above
 migrations/          SQL schema (source for both sqlc and initdb)
 web/                 the SvelteKit frontend
-extension/           the Chrome side-panel extension
-design-system/       shared tokens and components, linked into web/ and extension/
+design-system/       shared tokens and components, linked into web/
 internal/            ~130 domain packages; the load-bearing ones:
   config/            env configuration
   database/ db/      pgxpool pool; generated sqlc code + queries/*.sql
   handler/           HTTP handlers
-  auth/              auth primitives (JWT cookie, API keys) + OAuth sign-in
   sources/           source adapters (greenhouse / lever / adzuna / …) + registry
   boardcatalog/      the board catalog: which company crawls on which ATS, under what board id
   pipeline/          ingest runner (fetch → normalize → dedup → upsert)
@@ -211,23 +189,14 @@ internal/            ~130 domain packages; the load-bearing ones:
   location/ classify/ skilltag/  the curated facet dictionaries — never guess, emit nothing
   ghost/             the posting-reality signal behind "is this job real?"
   jobview/           the single public wire shape of a job
-  cv/ cvedit/        structured CVs + PDF rendering; cvedit is their only writer
-  experience/        durable employments + evidence atoms behind every CV claim
-  cvmatch/ matchanalysis/  deterministic CV↔vacancy score; the LLM fit analysis on top
-  applyform/         captured ATS application forms, in the platform's own vocabulary
-  userjob/ appevent/ per-user tracking (view / apply / save / stages) + the event ledger
-  inbox/             recruiter mail → classify → link to an application
-  assistant/         the in-process agent: turn loop, tools, transcripts
-  browsertools/      relays tool frames between the agent and the browser extension
-  referral/ collections/  employee referrals; curated company tags
-  llm/ llmkey/       provider-agnostic LLM client + per-user spend attribution
+  collections/       curated company collections
 ```
 
 ## Architecture
 
 How the pieces fit together — the crawl-to-search topology, what each directory
-above is for, and walkthroughs of the three main flows (finding a job, tailoring a
-CV, the in-app assistant), plus the auth model, notifications and the job
+above is for, and walkthroughs of the two main flows (ingestion and public job
+search), plus the job
 lifecycle: **[docs/architecture.md](docs/architecture.md)**.
 
 It is the map; the per-package `AGENTS.md` files it links to are the territory.
@@ -288,18 +257,8 @@ new provider before any code.
 A server-rendered SvelteKit 2 app (Svelte 5 runes, Tailwind 4, `adapter-node`)
 lives under `web/` and consumes the API same-origin; a dev Vite proxy forwards
 `/api` to the backend. Shared tokens and components come from the sibling
-`design-system/` package — install it before building `web/` or `extension/`,
-since it is symlinked, not copied. See [web/AGENTS.md](web/AGENTS.md).
-
-## Browser extension
-
-A Chrome extension puts the job-application agent in a side panel next to
-whatever posting you're on: it reads the page when you ask it something, shows
-a deterministic skill-coverage match against your freehire profile, and can
-fill the application form for you. Source lives under `extension/`
-([extension/AGENTS.md](extension/AGENTS.md)).
-
-**[Install it from the Chrome Web Store →](https://chromewebstore.google.com/detail/freehire/ijfaechijopdlikalojadpojmpilplnj?hl=en-US&utm_source=ext_sidebar)**
+`design-system/` package — install it before building `web/`, since it is
+symlinked, not copied. See [web/AGENTS.md](web/AGENTS.md).
 
 ## Contributing
 

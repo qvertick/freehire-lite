@@ -1,20 +1,13 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { JOBS_API_FAQ } from '#lib/jobsApiFaq.js';
-  import type { PlansMatrix } from '#lib/types.js';
   import { Button, SectionLabel } from '#lib/ui/index.js';
-  import ApiPlans from './ApiPlans.svelte';
 
-  // The commercial-use landing for the read API: who it is for, what a posting carries, what
-  // it costs and what the licence allows. Every figure comes from the page's loader — the
-  // catalogue snapshot and the plans endpoint — so nothing here can quote a number the API
-  // does not stand behind. A missing figure falls back to wording, never to a guess.
+  // Public documentation for the read API: its coverage, response shape and filters.
   const {
     stats,
-    plans,
   }: {
     stats: { jobs: number | null; companies: number | null; atsPlatforms: number | null };
-    plans: PlansMatrix | null;
   } = $props();
 
   const compact = (n: number) =>
@@ -25,26 +18,17 @@
       stats.jobs && { value: compact(stats.jobs), label: 'open postings, de-duplicated' },
       stats.companies && { value: compact(stats.companies), label: 'companies with profiles' },
       stats.atsPlatforms && { value: String(stats.atsPlatforms), label: 'ATS platforms read directly' },
-      plans && { value: plans.api_limits.data_per_minute.toLocaleString('en-US'), label: 'requests a minute on Data' },
     ].filter((f) => !!f),
   );
 
   const audiences = [
     {
       title: 'Job boards',
-      body: 'Fill a niche board by country, category or stack, and keep it current without running a crawler fleet of your own.',
-    },
-    {
-      title: 'Recruiting and HR tools',
-      body: 'Show live openings beside candidates, track which companies are hiring for what, and link straight to the employer’s own ATS.',
-    },
-    {
-      title: 'AI agents and assistants',
-      body: 'Give a product’s agent a real catalogue to search — structured filters, full descriptions in Markdown, no scraping.',
+      body: 'Search current openings by keyword, location, category or stack, then link visitors to the original posting.',
     },
     {
       title: 'Market research',
-      body: 'Count demand by skill, seniority, region or work mode, from postings read at the source rather than reposted.',
+      body: 'Explore hiring activity by skill, seniority, region or work mode across a deduplicated catalogue.',
     },
   ];
 
@@ -57,8 +41,7 @@
     ['Lifecycle', 'posted, first and last seen, and closed — a closed posting says so'],
   ];
 
-  const curl = `curl "https://freehire.me/api/v1/jobs/search?countries=de&category=software_engineering&limit=100" \\
-  -H "Authorization: Bearer $FREEHIRE_API_KEY"`;
+  const curl = `curl "https://freehire.me/api/v1/jobs/search?countries=de&category=software_engineering&limit=100"`;
 
   const sample = `{
   "data": [{
@@ -81,24 +64,23 @@
 
 <div class="jobs-api">
   <section class="grid-bg relative -mx-4 px-4 pb-14 pt-12 sm:pt-16">
-    <SectionLabel text="jobs api · commercial use" />
+    <SectionLabel text="public jobs api" />
     <h1
       class="mt-6 max-w-3xl text-balance text-4xl font-semibold leading-none tracking-tighter sm:text-6xl"
     >
-      Millions of open jobs, one API, one flat price.
+      Search the job catalogue through a public API.
     </h1>
     <p class="mt-7 max-w-2xl text-lg leading-relaxed text-muted-foreground">
       Postings read straight from employers’ own applicant-tracking systems, de-duplicated,
-      classified and linked to the company behind them. Use them in your product under a plain
-      licence — <span class="text-foreground">no per-job metering</span>, no sales call.
+      classified and linked to the company behind them. The API uses the same filters as the
+      public search page and does not require an account.
     </p>
     <div class="mt-9 flex flex-wrap items-center gap-3">
-      <Button href="#plans" variant="primary" size="lg">See plans</Button>
+      <Button href={resolve('/jobs')} variant="primary" size="lg">Browse jobs</Button>
       <Button href={resolve('/docs/api')} variant="outline" size="lg">API reference</Button>
     </div>
     <p class="mt-5 max-w-xl text-sm leading-relaxed text-muted-foreground">
-      The same API answers without a key for personal and non-commercial use, so you can build
-      against it today and add a key when you ship.
+      Requests are subject to public rate limits. The reference documents available routes and filters.
     </p>
 
     {#if figures.length > 0}
@@ -134,7 +116,7 @@
       A posting, already structured.
     </h2>
     <p class="mt-4 max-w-2xl leading-relaxed text-muted-foreground">
-      Every field on every plan, and every filter the site’s own search has — country, region,
+      Every filter the site’s own search has — country, region,
       city, category, seniority, skills, work mode, salary, company, source and freshness.
     </p>
     <div class="mt-10 grid gap-8 lg:grid-cols-2">
@@ -156,49 +138,37 @@
   </section>
 
   <section class="border-t border-border py-14 sm:py-16">
-    <SectionLabel text="how it is priced" />
+    <SectionLabel text="how to use it" />
     <h2 class="mt-6 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
-      You pay for the rate, not for the rows.
+      Start with the API reference.
     </h2>
     <div class="mt-10 grid gap-4 md:grid-cols-2">
       <div class="rounded-xl border border-border p-6">
-        <h3 class="font-semibold text-muted-foreground">Metered by record</h3>
+        <h3 class="font-semibold text-muted-foreground">Search the catalogue</h3>
         <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
-          The usual job-data pricing: a monthly allowance of records, and every posting you read
-          spends it. Around $100 a month buys tens of thousands of postings; mirroring a
-          catalogue of millions runs to thousands.
+          Read the API reference, then send a keyword or structured search request.
         </p>
       </div>
       <div class="rounded-xl border-2 border-primary p-6">
-        <h3 class="font-semibold">Flat on freehire</h3>
+        <h3 class="font-semibold">No account required</h3>
         <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
-          One monthly price and a per-minute request rate with no daily cap. A page returns up
-          to 100 full postings, so how much of the catalogue you read never changes the bill.
+          Catalogue browsing is available directly on the site. API requests are anonymous
+          and rate-limited to protect the service.
         </p>
       </div>
     </div>
   </section>
 
-  <section id="plans" class="scroll-mt-20 border-t border-border py-14 sm:py-16">
-    {#if plans}
-      <ApiPlans prices={plans.prices} limits={plans.api_limits} />
-    {:else}
-      <p class="text-center text-muted-foreground">
-        Plans are on the <a href={resolve('/pricing')} class="font-medium text-foreground underline-offset-4 hover:underline">pricing page</a>.
-      </p>
-    {/if}
-  </section>
-
   <section class="border-t border-border py-14 sm:py-16">
     <SectionLabel text="the licence" />
     <h2 class="mt-6 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
-      What a plan lets you do, in four lines.
+      Use the catalogue responsibly.
     </h2>
     <ul class="mt-8 flex max-w-2xl flex-col gap-3 text-muted-foreground">
       <li><span class="text-foreground">Store</span> what you read and <span class="text-foreground">show</span> it in your own product, commercial or not.</li>
       <li><span class="text-foreground">Don’t resell</span> the raw data as a dataset, download or feed of its own.</li>
       <li><span class="text-foreground">Analyse</span> it over time and train your own models on it.</li>
-      <li><span class="text-foreground">When the plan ends</span>, stop showing the postings. What you derived from them — figures, trends, models — stays yours.</li>
+      <li>Respect source terms and the data licence in our terms.</li>
     </ul>
     <p class="mt-6 text-sm text-muted-foreground">
       <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- resolve() is applied; the rule cannot see through the appended section anchor -->
@@ -222,10 +192,9 @@
   </section>
 
   <section class="border-t border-border py-14 text-center sm:py-16">
-    <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">Start with the free API, ship with a key.</h2>
+    <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">Try the public API.</h2>
     <div class="mt-8 flex flex-wrap justify-center gap-3">
-      <Button href="#plans" variant="primary" size="lg">Choose a plan</Button>
-      <Button href={resolve('/my/integrations/api-keys')} variant="outline" size="lg">Your API keys</Button>
+      <Button href={resolve('/docs/api')} variant="primary" size="lg">Read the API reference</Button>
     </div>
   </section>
 </div>

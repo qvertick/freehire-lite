@@ -1,21 +1,12 @@
 <script lang="ts">
   import { onMount, untrack, type Snippet } from 'svelte';
-  import { ArrowRight, ChevronDown, Layers, Map as MapIcon, Target } from '@lucide/svelte';
+  import { ChevronDown, Map as MapIcon } from '@lucide/svelte';
   import { browser } from '$app/env';
-  import { afterNavigate, goto, replaceState } from '$app/navigation';
-  import { resolve } from '$app/paths';
+  import { afterNavigate, replaceState } from '$app/navigation';
   import { page } from '$app/state';
   import { api, type Slice } from '#lib/api.js';
-  import { currentUser, isAuthenticated } from '#lib/auth.svelte.js';
-  import { promptSignIn } from '#lib/signin.js';
-  import { profileStore } from '#lib/profile.svelte.js';
   import { PUBLIC_OPEN_WITHIN } from '$app/env/public';
   import { openWithinEnabled } from '#lib/features.js';
-  import { computeClientMatch } from '#lib/jobMatch.js';
-  import { ensureViewedLoaded } from '#lib/viewedJobs.svelte.js';
-  import { ensureSavedLoaded } from '#lib/savedJobs.svelte.js';
-  import { ensureAppliedCompaniesLoaded } from '#lib/appliedCompanies.svelte.js';
-  import { ensureDismissedLoaded, isDismissed, markUndismissed } from '#lib/dismissedJobs.svelte.js';
   import { latestOnly } from '#lib/latestOnly.js';
   import { Paginator } from '#lib/paginated.svelte.js';
   import { pageCount, pageOffset, resumePage } from '#lib/pagination.js';
@@ -23,7 +14,6 @@
   import {
     FilterStore,
     filtersToParams,
-    matchSortNeedsSkills,
     selectedSortFor,
     sortOptionsFor,
     type JobSort,
@@ -33,11 +23,7 @@
   import { freshnessOptions } from '#lib/filterControls.js';
   import { geoScopeOffered, loadJobFilters, markGeoScopeOffered } from '#lib/filterStorage.js';
   import { geoScopeQuery, shouldOfferGeoScope, WORLDWIDE_REGION } from '#lib/geoScope.js';
-  import { bannerVisible, loadOnboardingState, markSeen, narrowestFacet, type OnboardingLifecycle } from '#lib/onboarding.js';
-  import { onboardingUrl } from '#lib/onboardingGate.svelte.js';
-  import { consumePendingAlert } from '#lib/saveSearchAlert.js';
-  import OnboardingBanner from './onboarding/OnboardingBanner.svelte';
-  import OnboardingAlertBanner from './onboarding/OnboardingAlertBanner.svelte';
+  import { narrowestFacet } from '#lib/onboarding.js';
   import { syncOnNavigation } from '#lib/urlSynced.svelte.js';
   import { setListSearchTarget } from '#lib/listSearch.svelte.js';
   import { track } from '#lib/analytics.js';
@@ -49,7 +35,6 @@
   import JobRow from './JobRow.svelte';
   import { Button } from '#lib/ui/index.js';
   import JobRowSkeleton from './JobRowSkeleton.svelte';
-  import HiddenToast from './HiddenToast.svelte';
 
   // Filters live in the URL; the route `load` searches by them and returns the
   // first page as `initial`, so the rows are in the initial HTML for SSR/share/
@@ -110,11 +95,8 @@
   // (company_slug, …). Reads `applied` so typing doesn't fetch per keystroke.
   const scopedParams = () => {
     const p = filtersToParams(filters.applied);
-    // Scoped loaders render anonymously and offer no control for this preference.
-    if (!standalone) {
-      p.delete('hide_seen');
-      p.delete('former_employers');
-    }
+    p.delete('hide_seen');
+    p.delete('former_employers');
     for (const [k, v] of Object.entries(scope)) p.set(k, v);
     return p;
   };
@@ -181,7 +163,7 @@
   // latestOnly stops a slow earlier response overwriting a newer one.
   let catalogCounts = $state.raw<FacetCounts | null>(null);
   // Facet counts cannot apply the former-employer constraint.
-  const counts = $derived(filters.value.formerEmployers ? null : catalogCounts);
+  const counts = $derived(catalogCounts);
   // The map dialog reads and writes `filters` itself, so a click on the map narrows the
   // list behind it. Its module (the land outline among it) loads on the first open only.
   let mapOpen = $state(false);
@@ -201,51 +183,9 @@
   // page, not a search facet — the match percent depends on the viewer's own profile
   // skills, which the backend/index never sees, so there's nothing to send server-side
   // (unlike salary/freshness, which narrow the actual query). Local and URL-free: a
-  // shared link's match filter would mean nothing to whoever opens it. `null` means
-  // "no threshold" (the slider's own default position doubles as "off").
-  let minMatch = $state<number | null>(null);
-
-  // Only a signed-in user with skills on their profile has a real match percent per
-  // card (see resolveMatchState's `ready` state in JobRow) — everyone else sees a
-  // teaser or nothing, so the slider would filter against a number that isn't real.
-  $effect(() => {
-    if (isAuthenticated()) profileStore.ensureLoaded();
-  });
-  const profileSkills = $derived(profileStore.profile?.skills ?? []);
-  // The server reads former_employers only for a signed-in caller, so only then does it
-  // explain an empty list.
-  const formerEmployersApplied = $derived(standalone && isAuthenticated() && filters.applied.formerEmployers);
-  const matchFilterAvailable = $derived(isAuthenticated() && profileStore.loaded && profileSkills.length > 0);
-  // Drop a stale threshold the moment the slider would disappear (sign-out, profile
-  // cleared) so it can't silently keep hiding jobs with no control left to reset it.
-  $effect(() => {
-    if (!matchFilterAvailable) minMatch = null;
-  });
-
-  // The orderings this caller can choose between, and which one the control shows —
-  // both pure, both in facetModel so they can be tested (see sortOptionsFor).
-  //
-  // Match is offered to everyone. It used to need the same profile the match SLIDER
-  // does, which meant the one ordering that answers "which of these actually suit me"
-  // was invisible to every visitor who had not filled a profile in — and nothing told
-  // them it existed. Choosing it without skills on file is now answered out loud
-  // instead, by the notice below the toolbar.
+  // The orderings this caller can choose between, and which one the control shows.
   const sortOptions = $derived(sortOptionsFor(filters.value.q));
   const selectedSort = $derived(selectedSortFor(filters.value));
-
-  // Whether that notice is showing: match is the ordering in force and there are no
-  // skills to rank against, so the server has quietly served newest instead.
-  //
-  // Three states, not two — "has skills", "has none", and "we do not know yet".
-  // `matchFilterAvailable` folds the third into the second, and the profile arrives one
-  // round trip after the page does, so asking it alone would put this notice in the
-  // server-rendered HTML for a signed-in user WITH skills and take it away a moment
-  // later. `loaded` exists for exactly this (see userResource.svelte.ts). Signed out
-  // there is nothing to wait for: no account means no profile, and that is known at once.
-  const skillsSettled = $derived(!isAuthenticated() || profileStore.loaded);
-  const matchNeedsSkills = $derived(
-    skillsSettled && matchSortNeedsSkills(filters.value, matchFilterAvailable),
-  );
 
   // Which date the above-list select bounds. Not $derived: the flag is a runtime env
   // value read once at module load, and it cannot change while the page is mounted.
@@ -265,49 +205,6 @@
   let lastSearchKey = untrack(() => filtersToParams(filters.applied).toString());
 
 
-  // Onboarding: the one-time nudge banner + wizard, standalone-only. The lifecycle
-  // lives in localStorage (client-only); seed it at init on the client so a returning
-  // (dismissed/completed) visitor never flashes a banner before mount. The banner is
-  // the sole entry — once dismissed or completed it retires; there is no persistent
-  // re-open control. "Set up" now navigates to /onboarding (registration is a step
-  // there, and it carries straight on into role/skills/level) rather than opening a
-  // local wizard that wrote to the anonymous filter query.
-  // Starts 'unseen' on both sides so the hydrated markup matches the server's; the
-  // stored value arrives on mount, by which point app.css has already hidden the
-  // banner for anyone who dismissed or completed it. Reading localStorage here
-  // instead would make the client disagree with the SSR output on the very first
-  // frame. Same shape as CliBanner's `dismissed`.
-  let onboardingState = $state<OnboardingLifecycle>('unseen');
-  // The ephemeral post-onboarding Telegram-alert offer (set after the wizard, or on
-  // mount to resume a pending alert after sign-in). Dismissible; not persisted.
-  let alertBanner = $state<{ query: string; autostart: boolean } | null>(null);
-  // Show only to an un-nudged visitor with no active facet filters AND no text query,
-  // so a shared search/filter link is never interrupted (activeFilterCount ignores the
-  // query, so check it explicitly).
-  //
-  // Deliberately NOT gated on `browser`. It was, and that is what made this banner
-  // the site's largest source of layout shift: the feed rendered without it, then
-  // hydration inserted 74px directly above the rows. Lab Lighthouse missed it
-  // (0.066) because it never carries a returning visitor's localStorage; CrUX put
-  // the mobile home page at CLS 0.28. It is server-rendered now, and hidden before
-  // first paint by app.css for a visitor who has already seen it.
-  const showBanner = $derived(
-    standalone &&
-      bannerVisible(onboardingState, filters.active > 0 || filters.value.q.trim() !== ''),
-  );
-
-  function dismissBanner() {
-    markSeen();
-    onboardingState = 'seen';
-  }
-  function openOnboarding() {
-    // The nudge has done its job whether or not the visitor follows through — it
-    // retires the same way dismissing it does, just via a different exit.
-    markSeen();
-    onboardingState = 'seen';
-    // eslint-disable-next-line svelte/no-navigation-without-resolve -- onboardingUrl() wraps resolve('/onboarding'); the rule can't see through the appended ?returnTo= query
-    void goto(onboardingUrl(page.url.pathname + page.url.search));
-  }
   // Narrow-feed relief: the single narrowest applied facet to drop (skills → regions →
   // seniority; never the role), or null if none. Shared by the empty-state guard and
   // the relax action so they can't disagree. Never broadens on its own.
@@ -315,18 +212,6 @@
   function relaxFeed() {
     if (relaxTarget) filters.clearFacet(relaxTarget);
   }
-
-  // Resume a save the user started before signing in. Reactive on the session so it
-  // fires whether auth resolved server-side (an OAuth full-page redirect — mount is
-  // already authed) or flipped in-tab (an in-dialog sign-in re-resolves page.data.user
-  // without a remount). Consumed exactly once; standalone list only; skipped if a banner
-  // is already showing.
-  $effect(() => {
-    if (!untrack(() => standalone) || alertBanner) return; // effect: client-only, no browser guard
-    if (!isAuthenticated()) return;
-    const pending = consumePendingAlert();
-    if (pending !== null) alertBanner = { query: pending, autostart: true };
-  });
 
   // Live disjunctive facet counts for the staged filter set (built by the modal),
   // merged with the fixed scope params (e.g. company_slug) so every control's counts —
@@ -345,22 +230,8 @@
   // Detect that mismatch so the first effect run reloads instead of keeping `initial`.
   const initialStale = browser && page.url.search !== location.search;
 
-  // For a signed-in user, load the set of already-viewed and already-saved slugs (and the
-  // employers already applied to) so JobRow can dim seen cards, fill saved bookmarks and
-  // mark applied-to companies (no-op when signed out — the
-  // sets stay empty). Cleanup: cancel any pending debounced reload so it can't fire
-  // after this view is gone.
+  // Cleanup cancels any pending debounced reload after this view is gone.
   onMount(() => {
-    // Catch up with the stored lifecycle now that localStorage is readable. For a
-    // returning visitor this drops the server-rendered banner — with no shift,
-    // because app.css already took it out of the flow before first paint.
-    onboardingState = loadOnboardingState();
-    if (isAuthenticated()) {
-      ensureViewedLoaded();
-      ensureSavedLoaded();
-      ensureDismissedLoaded();
-      ensureAppliedCompaniesLoaded();
-    }
     // Register this page's store so the header search drives it. This holds for the
     // standalone /jobs list AND the company page's embedded, scoped list — on
     // /companies/:slug the header search filters that company's postings (there's
@@ -436,63 +307,9 @@
   // is what put "No matching jobs." over a list that was merely reloading.
   const displayItems = $derived(holdingOver ? holdover : jobs.items);
 
-  // The feed minus the signed-in user's hidden jobs, and (when the match slider is
-  // active) minus jobs below the chosen match threshold. Dismissal is cross-referenced
-  // client-side against the shared dismissed set (loaded on mount), mirroring the
-  // viewed/saved sets — the server search is untouched. Re-derives when the page
-  // changes, when a hide/undo mutates the dismissed set, or when the slider moves, so
-  // a hidden or filtered-out card drops (and an undone one returns) instantly. A job
-  // with no skills has no percent to test (see computeClientMatch) and stays, matching
-  // the card's own `no-skills` state, which shows no match at all rather than a false 0%.
-  const visibleJobs = $derived(
-    displayItems.filter((j) => {
-      if (isDismissed(j.public_slug)) return false;
-      if (matchFilterAvailable && minMatch != null && (j.skills ?? []).length > 0) {
-        return computeClientMatch(j.skills ?? [], profileSkills).percent >= minMatch;
-      }
-      return true;
-    }),
-  );
-
-  // `jobs.total` is the server's raw count for the query — accurate for every facet,
-  // which all narrow the actual search, but not for the match slider, which only
-  // trims the already-fetched page client-side. Showing the raw total next to a
-  // shrunk list would read as a lie ("500 open jobs" over three visible cards), so
-  // swap in what's actually on screen while the threshold is active.
-  const listTotal = $derived(matchFilterAvailable && minMatch != null ? visibleJobs.length : jobs.total);
-
-  // The pending "Job hidden — Undo" toast, or null. Set when a card is hidden; the
-  // toast owns its auto-dismiss. Undo clears the slug's hidden mark (card returns via
-  // visibleJobs) and confirms with the server; a failed undo is swallowed — the
-  // durable recovery path is Activity → Hidden.
-  let hiddenToast = $state<{ slug: string } | null>(null);
-
-  function onHide(slug: string) {
-    hiddenToast = { slug };
-  }
-
-  async function undoHide() {
-    const pending = hiddenToast;
-    if (!pending) return;
-    markUndismissed(pending.slug);
-    hiddenToast = null;
-    try {
-      await api.undismissJob(pending.slug);
-    } catch {
-      // Swallow: the job is already back in the feed optimistically, and Activity →
-      // Hidden remains the durable way to manage hidden jobs.
-    }
-  }
-
-  // Enter swipe mode carrying the current filters + query (same param shape the
-  // list uses), so the deck reflects exactly what's on screen. `scope` params are
-  // fixed context (e.g. company_slug) and go along too.
-  function openSwipe() {
-    const params = scopedParams();
-    const qs = params.toString();
-    // eslint-disable-next-line svelte/no-navigation-without-resolve -- resolve() applied to the path; the rule can't see through the appended query string
-    goto(resolve('/jobs/swipe') + (qs ? `?${qs}` : ''));
-  }
+  // Rows currently visible, including the previous page during a debounced reload.
+  const visibleJobs = $derived(displayItems);
+  const listTotal = $derived(jobs.total);
 
   // Measure the facets for the scope now in force — on mount too, since they are not
   // server-rendered into this view.
@@ -512,22 +329,12 @@
     });
   });
 
-  // Personal feed preferences must be re-applied when the reader changes in-tab.
-  const searchUserID = $derived(
-    standalone && (filters.applied.hideSeen || filters.applied.formerEmployers) ? currentUser()?.id ?? null : null,
-  );
-
-  let lastSearchUserID = untrack(() => searchUserID);
-
   // Reload the list whenever the debounced filters change — a settled keystroke, an
   // immediate facet toggle, or a back/forward re-seed. The first run is a no-op: the
   // SSR `initial` already seeded page one.
   $effect(() => {
     void filters.applied; // track the debounced snapshot
-    void searchUserID;
     untrack(() => {
-      const readerChanged = searchUserID !== lastSearchUserID;
-      lastSearchUserID = searchUserID;
       const firstRun = !started;
       if (firstRun) {
         started = true;
@@ -547,16 +354,9 @@
       }
       // Same query: this is a re-seed (initial navigation, back/forward), not a new
       // search — reload the page being read instead of snapping back to the first.
-      const sameQuery = searchKey === lastSearchKey && !readerChanged;
+      const sameQuery = searchKey === lastSearchKey;
       lastSearchKey = searchKey;
       if (!sameQuery) activePage = 1;
-      if (readerChanged) {
-        // A new reader has a different result set; an old offset can be past its end.
-        const url = new URL(location.href);
-        url.searchParams.delete('page');
-        // eslint-disable-next-line svelte/no-navigation-without-resolve -- in-place query update to the current URL
-        replaceState(url, page.state);
-      }
       reloadList(sameQuery ? pageOffset(activePage) : 0);
     });
   });
@@ -792,8 +592,6 @@
   <Button
     variant="outline"
     size="sm"
-    disabled={filters.value.formerEmployers}
-    title={filters.value.formerEmployers ? 'Turn off Hiring again to explore the map' : undefined}
     aria-label="Map"
     onclick={() => {
       mapLoaded = true;
@@ -807,10 +605,6 @@
 
 {#snippet listControls()}
   {@render postedSelect()}
-  <!-- Unconditional. This used to be guarded against a one-option select - a label
-       wearing a control's clothes - which could happen when match was hidden from a
-       viewer with no profile. Every caller is now offered newest, most-viewed and match,
-       so the guard could never be false. -->
   {@render sortSelect()}
 {/snippet}
 
@@ -823,7 +617,7 @@
     <div class="sticky top-20 flex max-h-[calc(100vh-6.5rem)] flex-col gap-4 overflow-y-auto">
       {@render sidebarTop?.()}
       <div class="rounded-xl border border-border bg-card p-4">
-        <FilterSummary store={filters} exclude={excludeFacets} onOpen={() => (modalOpen = true)} canSave={standalone} />
+        <FilterSummary store={filters} exclude={excludeFacets} onOpen={() => (modalOpen = true)} />
       </div>
     </div>
   </aside>
@@ -834,76 +628,9 @@
       unit={listTotal === 1 ? 'job' : 'jobs'}
       settled={jobs.status === 'ready'}
       announceKey={resultSetKey}
-      onSwipe={standalone ? openSwipe : undefined}
       controls={listControls}
       leading={standalone ? mapButton : undefined}
     />
-
-    <!-- Onboarding nudges sit UNDER the toolbar so the feed controls stay at the top;
-         each shows once (until dismissed or completed), then retires. Never blocks
-         the feed below. -->
-    {#if showBanner || alertBanner}
-      <div class="mt-3">
-        {#if showBanner}
-          <OnboardingBanner onOpen={openOnboarding} onDismiss={dismissBanner} />
-        {/if}
-        {#if alertBanner}
-          <OnboardingAlertBanner
-            query={alertBanner.query}
-            autostart={alertBanner.autostart}
-            onDismiss={() => (alertBanner = null)}
-          />
-        {/if}
-      </div>
-    {/if}
-
-    <!-- Match was chosen and there is nothing to rank against. Sits with the nudges
-         above and, like them, never replaces the feed: the server degrades this request
-         to newest rather than refusing it, so there ARE jobs below — taking them away
-         would punish someone for pressing a button we offered them. What was missing
-         was only the explanation. -->
-    {#if matchNeedsSkills}
-      <!-- `role="status"` because this appears in response to changing the Sort control,
-           and a screen-reader user who just did that gets no other signal that the
-           ordering they picked was not the one served. -->
-      <!-- `my-4`, not the nudges' `mt-3`: the feed below sets no top margin of its own,
-           so a block sitting between the toolbar and the first job row has to carry the
-           air on BOTH sides or it reads as glued to the list. -->
-      <!-- Laid out like the feed nudges above (icon tile, text, action), and worded as
-           what the visitor gets rather than what the sort is missing. -->
-      <div
-        role="status"
-        class="my-4 flex flex-col gap-4 rounded-xl border border-brand/30 bg-brand/5 p-4 sm:flex-row sm:items-center sm:p-5"
-      >
-        <div class="flex min-w-0 flex-1 items-start gap-3">
-          <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-muted text-brand-strong" aria-hidden="true">
-            <Target class="size-5" />
-          </span>
-          <div class="min-w-0">
-            <p class="font-semibold text-foreground">See your best matches first</p>
-            <p class="mt-1 text-sm text-muted-foreground">
-              Add your skills or CV and every job is ranked by how well it fits you. Until
-              then, the newest jobs come first.
-            </p>
-          </div>
-        </div>
-        <!-- The way out of this state is the whole point of the notice, so it is the
-             framed call to action rather than a link trailing the paragraph. -->
-        {#if isAuthenticated()}
-          <Button variant="cta" href={resolve('/my/profile')} class="w-full shrink-0 sm:w-auto">
-            Add your CV
-            <ArrowRight class="size-4" aria-hidden="true" />
-          </Button>
-        {:else}
-          <!-- Signed out there is no profile to fill in yet, so the first step is the
-               account that would hold one. -->
-          <Button variant="cta" onclick={() => promptSignIn()} class="w-full shrink-0 sm:w-auto">
-            Sign in to see your matches
-            <ArrowRight class="size-4" aria-hidden="true" />
-          </Button>
-        {/if}
-      </div>
-    {/if}
 
     {#if jobs.status === 'loading' && !holdingOver}
       <States state="loading">
@@ -915,15 +642,6 @@
       <!-- Retry re-runs the same query on the page being read, the same reload a changed
            filter would start. -->
       <States state="error" message="Failed to load jobs." onRetry={() => reloadList(pageOffset(activePage))} />
-    {:else if displayItems.length === 0 && formerEmployersApplied}
-      <!-- Offer the experience bank without attributing a combined-filter miss to
-           the employers' hiring activity. Ambiguous company names are not guessed. -->
-      <States state="empty" message="No jobs at your former employers match the current filters." />
-      <p class="mt-2 text-center text-sm text-muted-foreground">
-        We match the companies in
-        <a href={resolve('/my/profile/experience')} class="font-medium text-foreground underline underline-offset-2">your experience</a>,
-        and leave out any name that could be more than one company.
-      </p>
     {:else if displayItems.length === 0}
       <States state="empty" message="No matching jobs." />
       {#if standalone && relaxTarget}
@@ -940,27 +658,12 @@
         </div>
       {/if}
     {:else}
-      {#if visibleJobs.length === 0}
-        <!-- The search DID match on this page — the client-side post-filters removed
-             every row. Saying "no matching jobs" here would blame the search for the
-             reader's own settings, and the two causes are worth telling apart because
-             one of them is a slider they can move. The paginator below still renders,
-             so this is somewhere to leave rather than a dead end. -->
-        <States
-          state="empty"
-          message={minMatch === null
-            ? 'Every job on this page is one you hid.'
-            : 'Every job on this page is hidden or below your match threshold.'}
-        />
-      {:else}
-        <!-- Busy while held-over rows stand in for a reload underneath them (see
-             `holdover`): the rows are real but about to be replaced. -->
-        <div class="flex flex-col gap-3" aria-busy={holdingOver}>
-          {#each visibleJobs as job (job.public_slug)}
-            <JobRow {job} {onHide} />
-          {/each}
-        </div>
-      {/if}
+      <!-- Busy while held-over rows stand in for a reload underneath them. -->
+      <div class="flex flex-col gap-3" aria-busy={holdingOver}>
+        {#each visibleJobs as job (job.public_slug)}
+          <JobRow {job} />
+        {/each}
+      </div>
 
       <!-- Page links, and the only way through the results: a scroll-to-bottom
            auto-load used to sit here, which grew the page every time the reader
@@ -977,48 +680,17 @@
   </div>
 </div>
 
-{#if standalone}
-  <!-- Desktop swipe-mode entry: an icon-only button pinned to the right viewport edge
-       (mobile uses the inline toolbar / scroll-revealed tab, so this is md-only). Fixed,
-       so it exists only while the standalone list is mounted and stays reachable while
-       scrolling; kept below the z-40 mobile overlays. -->
-  <button
-    type="button"
-    onclick={openSwipe}
-    aria-label="Swipe mode"
-    title="Swipe mode"
-    class="fixed right-0 top-16 z-30 hidden items-center rounded-l-xl border border-r-0 border-border bg-secondary py-2.5 pl-2.5 pr-2 text-secondary-foreground shadow-md transition-colors hover:bg-accent md:flex"
-  >
-    <Layers class="size-4 shrink-0" />
-  </button>
-{/if}
-
-{#if standalone && mapLoaded && !filters.value.formerEmployers}
+{#if standalone && mapLoaded}
   {#await import('./map/JobsMapDialog.svelte') then { default: JobsMapDialog }}
     <JobsMapDialog bind:open={mapOpen} store={filters} />
   {/await}
-{/if}
-
-<!-- Undo affordance for the hide gesture. Keyed by slug so hiding a second job while
-     a toast is up restarts the countdown for the newer one. A hide-then-forget is
-     still recoverable in Activity → Hidden. -->
-{#if hiddenToast}
-  {#key hiddenToast.slug}
-    <HiddenToast onUndo={undoHide} onClose={() => (hiddenToast = null)} />
-  {/key}
 {/if}
 
 <FilterModal
   store={filters}
   {counts}
   exclude={excludeFacets}
-  savedSearches={standalone}
-  formerEmployersAvailable={standalone}
-  hideSeenAvailable={standalone}
   open={modalOpen}
   onClose={() => (modalOpen = false)}
   {stagedCounts}
-  matchAvailable={matchFilterAvailable}
-  {minMatch}
-  onMinMatchChange={(v) => (minMatch = v)}
 />

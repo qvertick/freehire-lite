@@ -75,7 +75,6 @@ export const load: PageServerLoad = async ({ params, url, fetch }) => {
     initial,
     slug: params.slug,
     pageNumber,
-    referralAvailable: entity.referral_available,
     parent: entity.parent ?? null,
     subsidiaries: entity.subsidiaries ?? [],
   };

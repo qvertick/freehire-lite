@@ -2,17 +2,13 @@
   import { page } from '$app/state';
   import { resolve } from '$app/paths';
   import { toPath } from '#lib/pathname.js';
-  import { afterNavigate, goto } from '$app/navigation';
-  import { signinUrl } from '#lib/signin.js';
   import HeaderSearch from './HeaderSearch.svelte';
   import HeaderMenu from './HeaderMenu.svelte';
   import BrandMark from './BrandMark.svelte';
   import { isApiReferenceRoute, isWideHeaderRoute } from '#lib/shellLayout.js';
   import { HEADER_LINKS } from '#lib/siteNav.js';
 
-  // The header is three slots — logo | search | menu — identical on every
-  // viewport. Nav links, the account items, the theme toggle, and the auth
-  // action all live in HeaderMenu.
+  // The header is three slots — logo | search | menu — identical on every viewport.
   //
   // The middle slot is ONE search box, on every page but one. Where a list has
   // registered itself (the feed at /jobs, /companies, and a company's or collection's
@@ -34,8 +30,7 @@
   // The homepage is the one exception: its whole content is a large centred copy of
   // this same box, so the header renders none. Two identical fields on one screen make
   // the visitor choose between them for no reason, and the hero is the focused one.
-  // The brand and the menu stay — sign-in and notifications live in the menu's own
-  // control strip, and both have to remain reachable.
+  // The brand and public navigation stay.
   const bareHeader = $derived(page.url.pathname === '/');
 
   // The API reference is the one page below that has its own search already: Scalar's
@@ -70,35 +65,13 @@
    *  screen gets without anything here needing to know. */
   const LINKS_BELOW_LG = 2;
 
-  // On the full-viewport surfaces (the agent, the tailor workspace) the page below runs
-  // edge to edge under its own icon rail, and on the API reference the columns below
+  // On the API reference the columns below
   // (sidebar, content, request/response examples) are just as wide — so on all of them
   // the header drops the centered `max-w-6xl` and does the same: brand hard left, menu
   // hard right. The search keeps a readable width and centers itself in the gap rather
   // than stretching across the monitor.
   const wideHeader = $derived(isWideHeaderRoute(page.url.pathname));
 
-  // A failed OAuth callback lands back wherever that attempt's `returnTo` pointed,
-  // carrying `?auth_error` (appended by the backend — see internal/api/handler/oauth.go)
-  // — which could be ANY page, not just one that itself knows about /signin. This is
-  // the one place that catches it regardless of where it landed, and sends the visitor
-  // on to /signin with the failure surfaced there instead of opening the in-place
-  // dialog over whatever page that happened to be. Runs in afterNavigate — not
-  // onMount — because this header lives in the persistent root layout: a redirect
-  // that lands here via client-side navigation never remounts it, so onMount would
-  // fire only on a cold load and miss the in-app bounce. afterNavigate covers both
-  // the initial load and every later navigation, and stays off the SSR path.
-  afterNavigate(({ shallow }) => {
-    if (shallow) return; // SvelteKit 3 fires this for shallow routing too
-    if (!page.url.searchParams.has('auth_error')) return;
-    const query = [...page.url.searchParams]
-      .filter(([key]) => key !== 'auth_error')
-      .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-      .join('&');
-    const returnTo = page.url.pathname + (query ? `?${query}` : '');
-    // eslint-disable-next-line svelte/no-navigation-without-resolve -- signinUrl() wraps resolve('/signin'); the rule can't see through the appended query
-    void goto(signinUrl({ returnTo, error: 'oauth' }), { replaceState: true });
-  });
 </script>
 
 <!-- Solid (not backdrop-blur) on purpose: a backdrop-filter here would become the
@@ -119,7 +92,7 @@
     <div class={['flex shrink-0 items-center', wideHeader && 'flex-1 basis-0']}>
       <a
         href={resolve('/')}
-        aria-label="freehire"
+        aria-label="Job Searcher"
         class="flex items-center gap-2 text-sm font-semibold tracking-tight"
       >
         <BrandMark />
@@ -128,7 +101,7 @@
              box; the API reference's is Scalar's), which has the room. What the row spends
              that room on instead is the nav below, and the two budgets are the same 358px:
              they are set together. -->
-        <span class={showSiteNav ? 'inline' : 'hidden sm:inline'} aria-hidden="true">freehire</span>
+        <span class={showSiteNav ? 'inline' : 'hidden sm:inline'} aria-hidden="true">Job Searcher</span>
       </a>
     </div>
 
@@ -148,7 +121,7 @@
         <nav aria-label="Site" class="flex items-center gap-3 sm:gap-5 lg:gap-6">
           <!-- Divides the nav from the wordmark, the same rule the search box draws
                between its Location scope and the field. Without it the first link sat
-               one word-gap from "freehire" and read as part of it. -->
+               one word-gap from "Job Searcher" and read as part of it. -->
           <div aria-hidden="true" class="h-5 w-px shrink-0 bg-border"></div>
           {#each HEADER_LINKS as link, i (link.href)}
             {@const Icon = link.icon}

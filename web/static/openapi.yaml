@@ -1,2943 +1,1129 @@
 openapi: 3.0.3
 info:
   title: freehire public API
-  version: 1.1.0
-  description: |
-    Public, read-only freehire API: search IT jobs, read the live filter
-    vocabulary, inspect job and company details, and find similar jobs. Every
-    operation here answers without a key; an API plan's key only raises the rate
-    limit. Keyless use is for personal and non-commercial use — showing the
-    postings in a product you offer to others needs an API plan (see the
-    [data licence](https://freehire.me/terms#data-licence)). The authenticated tracking surface
-    (saved jobs, application stages, CV tooling) is deliberately excluded — this
-    schema is the integration contract for search, and is also what the freehire
-    custom GPT imports as an Action.
+  description: '## Base URL
 
-    ## Filter grammar
 
-    Facet parameters are **repeatable**, and the same grammar applies to all of
-    them:
+    The public job-search API is served under the base URL above. Catalogue reads do not require an account.
 
-    * `?skills=go&skills=kubernetes` — values of one facet are **ORed**: match
-      either.
-    * `?skills=go&skills=kubernetes&skills_mode=and` — `<facet>_mode=and` flips
-      that facet to **AND**: match both. Not available for geography (see below).
-    * `?source_exclude=adzuna` — `<facet>_exclude` removes matches. **Every**
-      string facet in this schema supports its `_exclude` twin, whether or not it
-      is listed below; only the most commonly used ones are declared explicitly.
-    * Different facets **AND** together: `?work_mode=remote&seniority=senior` is
-      remote *and* senior.
 
-    ## Geography is one OR-group
+    ## Response envelope
 
-    `regions`, `countries`, `cities` and `metros` name a single concept — *where* — so
-    their values join into **one OR-group** instead of intersecting.
-    `?countries=gb&cities=London` therefore returns *United Kingdom **or**
-    London*, which is **wider** than `?countries=gb` alone — not narrower. To
-    search one place, name only that place.
 
-    Picking two places reading as "either" is what makes
-    `?regions=eu&countries=br` ("Europe or Brazil") useful. There is no AND to
-    switch on: `<facet>_mode=and` does not apply to these three.
+    Single items use a `data` envelope. Collections include pagination metadata; errors use `{ "error":
+    "message" }` with a matching HTTP status.
 
-    `?regions=none` is a reserved value that selects postings with **no resolved
-    geography**, rather than a real region code.
 
-    ## Resolve values before filtering
+    ```json
 
-    `skills`, `countries`, `cities`, `category`, `source`,
-    `company_slug` and `collections` are open or large vocabularies. Call
-    `getJobFacets` (or `searchCities` for a city) to discover canonical values
-    with live counts. The `cities` filter also accepts recognized dictionary
-    aliases such as `München` and resolves them to the canonical facet value;
-    `searchCities` remains useful for discovering or disambiguating a city.
-    Unknown values are not an error; they simply match nothing.
+    { "data": { "...": "single item" } }
+
+
+    { "data": [ ... ], "meta": { "total": 4213, "limit": 20, "offset": 0 } }
+
+
+    { "error": "job not found" }
+
+    ```
+
+
+    ## Pagination
+
+
+    List and search endpoints accept limit and offset. Each endpoint documents its defaults, caps, and
+    paging bounds; meta.total reports the matches before paging.
+
+
+    ## Errors
+
+
+    Errors use standard HTTP status codes, including 400 for invalid input, 404 when a job or company
+    is not found, 429 when rate-limited, and 503 when search is unavailable.
+
 
     ## Rate limits
 
-    These endpoints need no key, which is not the same as being free. Without a
-    key, one per-address budget applies, shared by every public read —
-    `searchJobs`, `agentSearchJobs`, `getJobFacets`, `getJob`, `getSimilarJobs`,
-    `searchCompanies`, `getCompany` and `searchCities`: **120 requests per minute
-    and 2,000 per day**. `GET /plans` reports the figures in force
-    (`api_limits`).
 
-    ### Keyed tiers
+    Public reads are rate-limited. Requests over the applicable limit receive HTTP 429; honor Retry-After
+    when it is present.
 
-    Send a full-access key as `Authorization: Bearer fhk_…` — or the access
-    token of a signed-in MCP or CLI connection, `fhm_…` — and the budget is per
-    account rather than per address, shared by all of its full-access keys and
-    tokens and by every endpoint above. Its size is the account's tier (an embed
-    key is budgeted like no key):
 
-    | Tier | Per minute | Per day |
-    |---|---|---|
-    | No key (per address) | 120 | 2,000 |
-    | Free account | 600 | 10,000 |
-    | Pro | 800 | 30,000 |
-    | Ultra | 1,000 | 100,000 |
-    | [API plan](https://freehire.me/jobs-api) | 1,200 | no cap |
-    | [Data plan](https://freehire.me/jobs-api) | 6,000 | no cap |
+    ## Filtering jobs
 
-    These are the figures a deployment ships with; `GET /plans` reports the ones
-    in force (`api_limits.tiers`). An API plan also licenses the data for use in
-    your own product — see the
-    [data licence](https://freehire.me/terms#data-licence).
 
-    Every response carries where you stand, so you never have to discover the
-    ceiling by hitting it:
+    Except where noted below, these parameters apply to `GET /jobs/search` and `GET /jobs/facets`. Combine
+    any of them with full-text `q`.
 
-    * `X-RateLimit-Limit` — the ceiling in force.
-    * `X-RateLimit-Remaining` — requests left in the current window. The limiter
-      is a leaky bucket, not a counter, so this can trail your own request count
-      by one; treat it as a reading to pace against, not an exact ledger.
-    * `X-RateLimit-Reset` — whole seconds until your budget is full again.
 
-    Over the limit is `429` with `Retry-After` in whole seconds, alongside the
-    same three headers. **Read `X-RateLimit-Remaining` and slow down before you
-    are refused** — that is the whole reason it is sent on success too.
+    - Pass multiple values as a comma-separated list to OR them: `skills=go,rust` matches either. Repeating
+    the param (`skills=go&skills=rust`) also works.
 
-    Rarely, a response carries no `X-RateLimit-*` at all. That means the limiter
-    could not run and let the request through rather than failing it; treat it as
-    "unknown", not as "unlimited".
+    - Add `<param>_mode=and` to require all selected values: `skills=go,rust&skills_mode=and` matches
+    both.
 
-    ## Please say who you are
+    - Add `<param>_exclude=<value>` to exclude matches: `company_type_exclude=outstaff` drops outstaff
+    jobs.
 
-    Not required, not validated, and nothing behaves differently without it —
-    every caller gets the same budget and the same answers. It is a request.
+    - Different facets are ANDed together; numeric and boolean filters are ANDed too. The geography facets
+    are the one exception — see below.
 
-    Send a `User-Agent` naming your project:
+    - Geography is a single OR group: `regions`, `countries`, `metros` and `cities` widen each other instead
+    of narrowing. `regions=eu&countries=IT` means "in Europe **or** in Italy", so it returns everything
+    `regions=eu` alone would. To search one country, drop the region: `countries=IT`. The four name a
+    single concept — *where* — so picking two places reads as "either", which is what makes `regions=eu&countries=BR`
+    ("Europe or Brazil") useful. There is no AND to switch on: `_mode=and` does not apply to geography.
 
-    ```
-    acme/job-sync/1.4 (+https://github.com/acme/job-sync)
-    ```
+    - Use `regions=none` to match jobs with no resolved geography (an empty region set); it ORs with real
+    region values and supports `_exclude` like any region.
 
-    `owner/project` is the part that matters; the version and contact URL are
-    useful if you have them. What it buys you is a message before a limit or a
-    field changes, instead of a `429` as first notice — a default library
-    user-agent is indistinguishable from a thousand others, so there is nobody
-    to warn.
+    - A param no filter reads is ignored rather than refused, so existing links keep working, and comes
+    back in `meta.ignored_params`, with `did_you_mean` when it is only the singular of a real facet. Check
+    it: a dropped filter otherwise looks like a genuinely broad result. At most 10 are listed per response.
+    The same report rides on `/jobs/facets` and `/companies`, which grow a `meta` block only when there
+    is something to warn about. `/companies` filters on its own vocabulary, so a jobs facet sent there
+    is reported as ignored.
 
-    If identification ever gates anything, it will be through a key we issue,
-    not a string you set yourself.
 
-    ## An unknown PARAMETER is dropped, and says so
+    ### Facets
 
-    A parameter no filter reads is ignored rather than refused, so old saved
-    searches and shared links keep working. The cost is that `?country=it` —
-    singular, and not the facet's name — returns the entire catalogue, which
-    looks exactly like a search that legitimately matched everything.
 
-    So the response tells you. `meta.ignored_params` lists what was thrown away,
-    with `did_you_mean` when the miss was only grammatical number:
+    Every facet below supports repeat-OR, `_mode=and`, and `_exclude` as described above.
 
-    ```json
-    "meta": {
-      "total": 1475149, "limit": 10, "offset": 0,
-      "ignored_params": [
-        { "param": "country", "did_you_mean": "countries" },
-        { "param": "skil" }
-      ]
-    }
-    ```
 
-    **Check it before trusting a filtered result.** The key is absent on a clean
-    request, never `[]`, so its presence alone is the signal. `searchJobs`,
-    `agentSearchJobs`, `searchCompanies` and `getJobFacets` all report — and
-    `getJobFacets` grows a `meta` block it otherwise does not have. The report is
-    capped at ten entries.
+    | Param | Filter | Values |
 
-    `searchCompanies` checks against its OWN vocabulary: a jobs facet sent there
-    (`?seniority=senior`) is a real facet name, but not one company search reads,
-    so it is ignored and reported.
+    | --- | --- | --- |
 
-    ## An unknown VALUE of a closed facet narrows to nothing, and says so
+    | `collections` | Collection | yc, techstars, a16z-portfolio, a16z-speedrun, sequoia, accel, greylock,
+    usv, bond, lightspeed, index-ventures, softbank-vision-fund, founders-fund, european, ai, mag7, bigtech,
+    unicorn, fortune500, eastern-roots, indian-roots, ai-native, uk-skilled-worker-sponsor, nl-recognised-sponsor,
+    us-h1b-sponsor, ca-lmia-employer, ie-permit-employer, dk-fast-track-company |
 
-    Facets with a fixed vocabulary (`work_mode`, `regions`, `seniority`,
-    `category`, `employment_type`, `education_level`, `company_type`,
-    `company_size`, `salary_period`, `relocation`, `english_level`, `role_type`,
-    `source_type`, `ai_archetype`, `domains`, `reality`, `perks`, `engagement`, `skills` and the boolean facets) still
-    apply a value outside it — so `?work_mode=foo` answers `total: 0`, which reads
-    exactly like an empty market. `meta.ignored_values` names such values per
-    parameter (the `_exclude` form under its own name):
+    | `regions` | Region | global, north_america, latam, eu, uk, mena, africa, apac, cis, none |
 
-    ```json
-    "meta": { "total": 0, "limit": 10, "offset": 0,
-              "ignored_values": { "work_mode": ["foo"] } }
-    ```
+    | `work_mode` | Work format | remote, hybrid, onsite |
 
-    Values are compared case-insensitively. A `skills` value is checked against
-    the skill dictionary that tags postings, so an alias it knows (`golang`) is
-    not unknown — it is read as its canonical slug (`go`). Open facets
-    (`countries`, `cities`, `company_slug`, `source`, `collections`,
-    `salary_currency`, `posting_language`) are not checked: an unknown value there can be
-    legitimate. Absent on a clean request; capped at ten parameters of ten
-    values each. Reported by `searchJobs`, `agentSearchJobs` and
-    `getJobFacets`.
+    | `category` | Specialization | software_engineering, backend, frontend, fullstack, mobile, devops,
+    sre, network_engineering, it_support, data_engineering, data_science, data_analytics, ml_ai, ai_engineering,
+    qa, security, hardware, embedded, blockchain, architecture, design, creative, engineering_design,
+    industrial_engineering, occupational_safety, product, project_management, healthcare, skilled_trades,
+    retail, hospitality, logistics, education, personal_services, administration, social_services, science,
+    manufacturing, public_safety, marketing, sales, support, business_analysis, solutions_engineering,
+    developer_relations, technical_writing, recruiting, hr, finance, legal, operations, customer_success,
+    other. The retired value management is still accepted and answered as role_type=people_manager |
+
+    | `ai_archetype` | AI Specialization | rag_app_builder, agent_builder, cloud_ml_platform_engineer,
+    ml_trainer_researcher, fullstack_ai_engineer, devops_infra_engineer |
+
+    | `seniority` | Seniority | intern, junior, middle, senior, lead, staff, principal, c_level |
+
+    | `role_type` | Role type | people_manager — the title names a people-management role. One value only:
+    carrying nothing means no management marker was found, NOT that the posting is individual-contributor
+    work, so role_type_exclude means "no marker", not "IC" |
+
+    | `skills` | Skills | Open vocabulary — call /jobs/facets for live values |
+
+    | `domains` | Industry | fintech, crypto, ecommerce, gambling, gamedev, media, travel, healthcare,
+    edtech, govtech, devtools, cybersecurity, ai, hrtech, adtech, proptech, logistics, mobility, climatetech,
+    other |
+
+    | `company_type` | Company type | product, startup, outsource, outstaff, agency, inhouse, government
+    |
+
+    | `countries` | Countries | Open vocabulary — call /jobs/facets for live values |
+
+    | `cities` | City | Open vocabulary — call /jobs/facets for live values. Recognized dictionary aliases
+    such as München and Köln resolve to their canonical city names. |
+
+    | `metros` | Metro area | Open vocabulary — call /jobs/facets for live values |
+
+    | `relocation` | Relocation | not_supported, supported, required |
+
+    | `employment_type` | Employment | full_time, part_time, contract, internship, fellowship |
+
+    | `engagement` | Contract terms | ir35_outside, ir35_inside, w2, 1099, c2c, contract_to_hire, b2b,
+    uop, umowa_zlecenie, umowa_o_dzielo, clt, pj, tk, gph, samozanyaty, ip, freiberuflich, arbeitnehmerueberlassung,
+    zzp, auto_entrepreneur, portage_salarial, autonomo, monotributo — employee or own business, in each
+    market''s own term (UK IR35, US W-2/1099/C2C, Polish B2B and umowy, Brazilian CLT/PJ, Russian ТК/ГПХ/самозанятость/ИП,
+    German, Dutch, French, Spanish and Argentine freelance statuses), as the title, the description or
+    a source''s own contract-type field states it; a posting offering several carries each, one that does
+    not say carries none. Separate from employment_type |
+
+    | `english_level` | English | none, a1, a2, b1, b2, c1, c2, native |
+
+    | `posting_language` | Job language | Open vocabulary — call /jobs/facets for live values |
+
+    | `reality` | Posting reality | fresh, stale, likely-evergreen |
+
+    | `salary_currency` | Currency | USD, EUR, GBP, RUB |
+
+    | `perks` | Perks mentioned | generous_pto, four_day_week, 401k_match, parental_leave, retirement_plan,
+    tuition_reimbursement, unlimited_pto, health_insurance, mental_health, learning_budget, home_office_stipend,
+    sabbatical, sign_on_bonus — matched from the description; a posting without one does not mention it,
+    which is not the same as not offering it |
+
+    | `equity` | Equity | salary_and_equity, equity_only, not_stated — not_stated means none was read,
+    not that the job offers no equity |
+
+    | `company_slug` | Company | Open vocabulary — call /jobs/facets for live values |
+
+    | `source_type` | Source type | ats, company, aggregator, social |
+
+    | `clearance_levels` | Clearance level | none, confidential, secret, top_secret, ts_sci, public_trust,
+    interim, other. none = no detected clearance requirement (the same postings as requires_clearance=false);
+    other = a non-US scheme (UK SC/DV, AU NV1, NATO) or a clearance stated with no level; interim is stated
+    beside a level, not instead of one |
+
+    | `source` | Source | Open vocabulary — call /jobs/facets for live values |
+
+    | `company_size` | Company size | 1-10, 11-50, 51-200, 201-500, 501-1000, 1000+ |
+
+    | `education_level` | Education level | none, bachelor, master, phd |
+
+    | `salary_period` | Salary period | year, month, day, hour |
+
+
+    ### Numeric & boolean filters
+
+
+    | Param | Filter | Values |
+
+    | --- | --- | --- |
+
+    | `visa_sponsorship` | Visa sponsorship | true, false |
+
+    | `requires_clearance` | Security clearance required | true, false |
+
+    | `via_recruiter` | Posting says a recruiter publishes it for a client | true — the description says
+    so; false — every posting not marked, including recruiter posts that never say so |
+
+    | `salary_min` | Minimum salary | integer — jobs whose minimum salary is at least this (pair with
+    salary_currency) |
+
+    | `salary_max` | Maximum salary | integer — jobs whose maximum salary is at most this (pair with salary_currency)
+    |
+
+    | `experience_years_min` | Minimum experience | integer — jobs requiring at least this many years
+    |
+
+    | `experience_years_max` | Maximum experience | integer — jobs requiring at most this many years,
+    the same figure experience_years_min bounds from below. Use 0 for jobs stating no prior experience
+    is required. Either bound excludes jobs that state no requirement at all, unless experience_include_unspecified
+    is set |
+
+    | `experience_include_unspecified` | Include unstated experience | true — with either experience bound,
+    also keep the jobs that state no experience requirement (most of the catalogue). Has no effect without
+    a bound |
+
+    | `experience_only_seniority_unspecified` | Experience only without a level | true — apply either
+    experience bound only to the jobs that carry no seniority level; a job with a level passes the bound
+    whatever it states. With seniority and seniority_include_unspecified this reads "one of these levels,
+    or no level and within the bound". Has no effect without a bound |
+
+    | `seniority_include_unspecified` | Include unstated seniority | true — with seniority, also keep
+    the jobs that carry no seniority level (most of the catalogue). Has no effect without an included
+    seniority |
+
+    | `posted_within_days` | Posted within | integer — jobs whose SOURCE states a posting date in the
+    last N days. Some boards restate that date on every crawl, so a job open for months can satisfy a
+    narrow bound here; open_within_days is the one that cannot be rewritten from outside |
+
+    | `open_within_days` | Open within | integer — jobs first recorded by freehire in the last N days,
+    i.e. how long the posting has been in the catalogue regardless of the date its source states. Independent
+    of posted_within_days; both may be set and they narrow together |
+
+
+    ### Recipes
+
+
+    - **Senior Go, remote, in the CIS region** — `q=go&seniority=senior&work_mode=remote&regions=cis`
+
+    - **Backend roles, freshest first, in Germany** — `category=backend&countries=DE&sort=posted_at&order=desc`
+
+    - **One country only — no region param, or it widens back out** — `countries=IT&employment_type=contract`
+
+    - **Must use both Go and Rust** — `skills=go,rust&skills_mode=and`
+
+    - **Exclude outstaff companies** — `company_type_exclude=outstaff`
+
+    - **At least $100k, with visa sponsorship** — `salary_currency=USD&salary_min=100000&visa_sponsorship=true`
+
+    - **Excluding jobs that need a security clearance** — `clearance_levels=none`
+
+    - **Jobs stating Secret or Top Secret clearance** — `clearance_levels=secret,top_secret`
+
+    - **Only jobs that need a security clearance** — `requires_clearance=true`'
+  version: 2.0.0
 servers:
-  - url: https://freehire.me/api/v1
-# Every endpoint here also answers without a key; a key only selects the API plan's budget.
-security:
-  - {}
-  - bearerAuth: []
+- url: https://freehire.me/api/v1
 tags:
-  - name: Jobs
-    description: Public job search, facets, details, and similar jobs.
-  - name: Companies
-    description: Public company search and company details.
-  - name: Geography
-    description: Canonical city vocabulary for the cities facet.
+- name: Jobs
+  description: Public job catalogue, keyword search, filters, and duplicate discovery.
+- name: Companies
+  description: Public company directory and company job listings.
+- name: Geography
+  description: Public location lookup for search filters.
+- name: Suggestions and live feed
+  description: Search completions and the live stream shown on the public homepage.
+- name: Catalogue
+  description: Public catalogue scale and freshness information.
+- name: Sitemaps
+  description: Public paginated reads used to build job and company XML sitemaps.
 paths:
+  /jobs:
+    get:
+      operationId: get_jobs
+      summary: List jobs, newest first, with limit/offset pagination.
+      description: 'Takes no filters at all — `limit` and `offset` are the whole vocabulary. Anything
+        else is ignored rather than refused, and listed in `meta.ignored_params`: a filter param sent
+        here returns the entire catalogue, which is indistinguishable from a narrow result unless you
+        check. Use `/jobs/search` to filter.'
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        description: Page size, 1–100.
+        schema:
+          type: integer
+        example: '20'
+      - name: offset
+        in: query
+        required: false
+        description: Rows to skip.
+        schema:
+          type: integer
+        example: '0'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: string
+              example: "{\n              \"data\": [\n                {\n                  \"public_slug\"\
+                : \"senior-go-engineer-acme-1a2b\",\n                  \"source\": \"greenhouse\",\n \
+                \                 \"manually_added\": false,\n                  \"external_id\": \"123\"\
+                ,\n                  \"url\": \"https://boards.greenhouse.io/acme/jobs/123\",\n      \
+                \            \"title\": \"Senior Go Engineer\",\n                  \"company\": \"Acme\"\
+                ,\n                  \"company_slug\": \"acme\",\n                  \"location\": \"Remote\
+                \ — EU\",\n                  \"description\": \"...\",\n                  \"countries\"\
+                : [\"DE\"],\n                  \"regions\": [\"eu\"],\n                  \"work_mode\"\
+                : \"remote\",\n                  \"skills\": [\"go\", \"postgresql\"],\n             \
+                \     \"cities\": [\"Berlin\"],\n                  \"collections\": [\"yc\"],\n      \
+                \            \"is_tech\": \"tech\",\n                  \"posted_at\": \"2026-06-18T00:00:00Z\"\
+                ,\n                  \"created_at\": \"2026-06-18T09:12:00Z\",\n                  \"updated_at\"\
+                : \"2026-06-18T09:12:00Z\",\n                  \"closed_at\": null,\n                \
+                \  \"enrichment\": {\n                    \"summary\": \"...\",\n                    \"\
+                seniority\": \"senior\",\n                    \"category\": \"backend\",\n           \
+                \         \"employment_type\": \"full_time\",\n                    \"relocation\": \"\
+                not_supported\",\n                    \"visa_sponsorship\": false,\n                 \
+                \   \"experience_years_min\": 5,\n                    \"english_level\": \"b2\",\n   \
+                \                 \"education_level\": \"bachelor\",\n                    \"domains\"\
+                : [\"fintech\"],\n                    \"posting_language\": \"en\",\n                \
+                \    \"company_type\": \"product\",\n                    \"company_size\": \"51-200\"\
+                ,\n                    \"salary_min\": 90000,\n                    \"salary_max\": 130000,\n\
+                \                    \"salary_currency\": \"EUR\",\n                    \"salary_period\"\
+                : \"year\"\n                  },\n                  \"enriched_at\": \"2026-06-18T09:20:00Z\"\
+                ,\n                  \"enrichment_version\": 7,\n                  \"view_count\": 42,\n\
+                \                  \"reality\": {\n                    \"class\": \"fresh\",\n       \
+                \             \"age_days\": 3,\n                    \"repost_count\": 0,\n           \
+                \         \"mass_posting_count\": 0,\n                    \"fake_freshness\": false\n\
+                \                  }\n                }\n              ],\n              \"meta\": { \"\
+                total\": 4213, \"limit\": 20, \"offset\": 0 }\n            }"
+      security: []
+      tags:
+      - Jobs
   /jobs/search:
     get:
-      operationId: searchJobs
-      tags:
-        - Jobs
-      summary: Search open jobs
-      description: |
-        Full-text and faceted search over open postings. Descriptions are the
-        search index's truncated preview. Use `agentSearchJobs` when you need the
-        full verbatim body of every hit, or `getJob` for the one posting the user
-        picked.
+      operationId: get_jobs_search
+      summary: Full-text + faceted search over open jobs.
+      description: 'Combine free-text `q` with any of the filter params below. Repeated facet params are
+        ORed; add `<param>_mode=and` to require all, or `<param>_exclude=<value>` to exclude. Without
+        `q`, results default to newest first; with `q`, to relevance. A param no filter reads is ignored
+        rather than refused, and listed in `meta.ignored_params` — check it, since a dropped filter otherwise
+        looks like a broad result.
 
-        Closed postings are never in the index, so they never appear here.
-      x-openai-isConsequential: false
+
+        Plus every filter in the "Filtering jobs" section above.'
       parameters:
-        - $ref: "#/components/parameters/Q"
-        - $ref: "#/components/parameters/QFields"
-        - $ref: "#/components/parameters/WorkModeRemoteAnywhere"
-        - $ref: "#/components/parameters/WorkModeRemoteRegions"
-        - $ref: "#/components/parameters/WorkModeRemoteCountries"
-        - $ref: "#/components/parameters/HideSeen"
-        - $ref: "#/components/parameters/HideAppliedCompanies"
-        - $ref: "#/components/parameters/Limit"
-        - $ref: "#/components/parameters/Offset"
-        - $ref: "#/components/parameters/Sort"
-        - $ref: "#/components/parameters/Order"
-        - $ref: "#/components/parameters/Regions"
-        - $ref: "#/components/parameters/Countries"
-        - $ref: "#/components/parameters/Cities"
-        - $ref: "#/components/parameters/Metros"
-        - $ref: "#/components/parameters/WorkMode"
-        - $ref: "#/components/parameters/Category"
-        - $ref: "#/components/parameters/Seniority"
-        - $ref: "#/components/parameters/Skills"
-        - $ref: "#/components/parameters/SkillsMode"
-        - $ref: "#/components/parameters/IsTech"
-        - $ref: "#/components/parameters/RequiresClearance"
-        - $ref: "#/components/parameters/ViaRecruiter"
-        - $ref: "#/components/parameters/Equity"
-        - $ref: "#/components/parameters/ClearanceLevels"
-        - $ref: "#/components/parameters/Perks"
-        - $ref: "#/components/parameters/PerksExclude"
-        - $ref: "#/components/parameters/PerksMode"
-        - $ref: "#/components/parameters/Engagement"
-        - $ref: "#/components/parameters/EngagementExclude"
-        - $ref: "#/components/parameters/ClearanceLevelsExclude"
-        - $ref: "#/components/parameters/EquityExclude"
-        - $ref: "#/components/parameters/AutoApplyAvailable"
-        - $ref: "#/components/parameters/AIArchetype"
-        - $ref: "#/components/parameters/RoleType"
-        - $ref: "#/components/parameters/Collections"
-        - $ref: "#/components/parameters/Reality"
-        - $ref: "#/components/parameters/Source"
-        - $ref: "#/components/parameters/SourceType"
-        - $ref: "#/components/parameters/CompanySlug"
-        - $ref: "#/components/parameters/EmploymentType"
-        - $ref: "#/components/parameters/Relocation"
-        - $ref: "#/components/parameters/EnglishLevel"
-        - $ref: "#/components/parameters/EducationLevel"
-        - $ref: "#/components/parameters/PostingLanguage"
-        - $ref: "#/components/parameters/Domains"
-        - $ref: "#/components/parameters/CompanyType"
-        - $ref: "#/components/parameters/CompanySize"
-        - $ref: "#/components/parameters/SalaryCurrency"
-        - $ref: "#/components/parameters/SalaryPeriod"
-        - $ref: "#/components/parameters/VisaSponsorship"
-        - $ref: "#/components/parameters/SalaryMin"
-        - $ref: "#/components/parameters/SalaryMax"
-        - $ref: "#/components/parameters/ExperienceYearsMin"
-        - $ref: "#/components/parameters/ExperienceYearsMax"
-        - $ref: "#/components/parameters/ExperienceIncludeUnspecified"
-        - $ref: "#/components/parameters/ExperienceOnlySeniorityUnspecified"
-        - $ref: "#/components/parameters/SeniorityIncludeUnspecified"
-        - $ref: "#/components/parameters/PostedWithinDays"
-        - $ref: "#/components/parameters/OpenWithinDays"
-        - $ref: "#/components/parameters/ApplyQuestionsMax"
-        - $ref: "#/components/parameters/RegionsExclude"
-        - $ref: "#/components/parameters/CountriesExclude"
-        - $ref: "#/components/parameters/WorkModeExclude"
-        - $ref: "#/components/parameters/RoleTypeExclude"
-        - $ref: "#/components/parameters/SkillsExclude"
-        - $ref: "#/components/parameters/SourceExclude"
-        - $ref: "#/components/parameters/SourceTypeExclude"
-        - $ref: "#/components/parameters/CompanySlugExclude"
-        - $ref: "#/components/parameters/FormerEmployers"
-      responses:
-        "200":
-          description: Matching jobs with pagination metadata.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/JobListEnvelope"
-        default:
-          $ref: "#/components/responses/Error"
-  /agent/jobs/search:
-    get:
-      operationId: agentSearchJobs
-      tags:
-        - Jobs
-      summary: Search open jobs for agents (full descriptions)
-      description: |
-        The same text query and facet filters as `searchJobs`, but every result carries the
-        job's **full** description, read verbatim from the database rather than
-        the search index's preview, in the format selected by
-        `description_format`.
-
-        Responses are several times larger per hit than `searchJobs`, so prefer a
-        small `limit`.
-
-        Send `semantic=true` to rank by meaning as well as keywords (a hybrid search
-        over posting descriptions) — for a need described in words, not a job title
-        or a non-technical role, where keywords answer better. `meta.semantic` then says whether that ran
-        (`applied`) or the request was answered by keywords alone (`unavailable`);
-        it is omitted when the flag was not sent. An `applied` answer also carries
-        `meta.total_is_lower_bound: true`: a vector search has no count, so
-        `meta.total` is "at least this many" — what the pages so far reached, plus
-        one when there is a next page.
-      x-openai-isConsequential: false
-      parameters:
-        - $ref: "#/components/parameters/Q"
-        - $ref: "#/components/parameters/QFields"
-        - $ref: "#/components/parameters/WorkModeRemoteAnywhere"
-        - $ref: "#/components/parameters/WorkModeRemoteRegions"
-        - $ref: "#/components/parameters/WorkModeRemoteCountries"
-        - $ref: "#/components/parameters/Limit"
-        - $ref: "#/components/parameters/Offset"
-        - $ref: "#/components/parameters/Sort"
-        - $ref: "#/components/parameters/Order"
-        - $ref: "#/components/parameters/DescriptionFormat"
-        - $ref: "#/components/parameters/Semantic"
-        - $ref: "#/components/parameters/Regions"
-        - $ref: "#/components/parameters/Countries"
-        - $ref: "#/components/parameters/Cities"
-        - $ref: "#/components/parameters/Metros"
-        - $ref: "#/components/parameters/WorkMode"
-        - $ref: "#/components/parameters/Category"
-        - $ref: "#/components/parameters/Seniority"
-        - $ref: "#/components/parameters/Skills"
-        - $ref: "#/components/parameters/SkillsMode"
-        - $ref: "#/components/parameters/IsTech"
-        - $ref: "#/components/parameters/RequiresClearance"
-        - $ref: "#/components/parameters/ViaRecruiter"
-        - $ref: "#/components/parameters/Equity"
-        - $ref: "#/components/parameters/ClearanceLevels"
-        - $ref: "#/components/parameters/Perks"
-        - $ref: "#/components/parameters/PerksExclude"
-        - $ref: "#/components/parameters/PerksMode"
-        - $ref: "#/components/parameters/Engagement"
-        - $ref: "#/components/parameters/EngagementExclude"
-        - $ref: "#/components/parameters/ClearanceLevelsExclude"
-        - $ref: "#/components/parameters/EquityExclude"
-        - $ref: "#/components/parameters/AutoApplyAvailable"
-        - $ref: "#/components/parameters/AIArchetype"
-        - $ref: "#/components/parameters/RoleType"
-        - $ref: "#/components/parameters/Collections"
-        - $ref: "#/components/parameters/Reality"
-        - $ref: "#/components/parameters/Source"
-        - $ref: "#/components/parameters/SourceType"
-        - $ref: "#/components/parameters/CompanySlug"
-        - $ref: "#/components/parameters/EmploymentType"
-        - $ref: "#/components/parameters/Relocation"
-        - $ref: "#/components/parameters/EnglishLevel"
-        - $ref: "#/components/parameters/EducationLevel"
-        - $ref: "#/components/parameters/PostingLanguage"
-        - $ref: "#/components/parameters/Domains"
-        - $ref: "#/components/parameters/CompanyType"
-        - $ref: "#/components/parameters/CompanySize"
-        - $ref: "#/components/parameters/SalaryCurrency"
-        - $ref: "#/components/parameters/SalaryPeriod"
-        - $ref: "#/components/parameters/VisaSponsorship"
-        - $ref: "#/components/parameters/SalaryMin"
-        - $ref: "#/components/parameters/SalaryMax"
-        - $ref: "#/components/parameters/ExperienceYearsMin"
-        - $ref: "#/components/parameters/ExperienceYearsMax"
-        - $ref: "#/components/parameters/ExperienceIncludeUnspecified"
-        - $ref: "#/components/parameters/ExperienceOnlySeniorityUnspecified"
-        - $ref: "#/components/parameters/SeniorityIncludeUnspecified"
-        - $ref: "#/components/parameters/PostedWithinDays"
-        - $ref: "#/components/parameters/OpenWithinDays"
-        - $ref: "#/components/parameters/ApplyQuestionsMax"
-        - $ref: "#/components/parameters/RegionsExclude"
-        - $ref: "#/components/parameters/CountriesExclude"
-        - $ref: "#/components/parameters/WorkModeExclude"
-        - $ref: "#/components/parameters/RoleTypeExclude"
-        - $ref: "#/components/parameters/SkillsExclude"
-        - $ref: "#/components/parameters/SourceExclude"
-        - $ref: "#/components/parameters/SourceTypeExclude"
-        - $ref: "#/components/parameters/CompanySlugExclude"
-      responses:
-        "200":
-          description: Matching jobs with pagination metadata.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/JobListEnvelope"
-        default:
-          $ref: "#/components/responses/Error"
-  /ojcp/v1/search:
-    post:
-      operationId: ojcpSearchJobs
-      tags:
-        - Jobs
-      summary: "OJCP: search jobs"
-      description: |
-        The `search_jobs` tool of the [Open Job Context Protocol](https://spec.ojcp.dev/),
-        answered over REST. The same query the other search endpoints run, projected into
-        OJCP's own shapes — each result is a `JobPosting` carrying the paths it can be
-        applied through and whether an agent can submit unattended.
-
-        Discover this surface at `/.well-known/ojcp.json`. The same three tools are
-        served over MCP at `/api/v1/ojcp/mcp`, which is the transport most agents use.
-
-        A filter this provider cannot honour is named in `ignored_params` rather than
-        silently dropped: an answer that widened because a parameter was not understood
-        says so.
-
-        Send `semantic: true` to rank by meaning as well as keywords (a hybrid search
-        over posting descriptions) — for a need described in words, not a job title
-        or a non-technical role, where keywords answer better. The response's `semantic` then says whether that ran
-        (`applied`) or fell back to keyword search (`unavailable`); a slow or absent
-        embedding backend never fails the request. An `applied` answer marks
-        `total_results` with `total_is_lower_bound: true` — "at least", not a count.
-      x-openai-isConsequential: false
-      requestBody:
+      - name: q
+        in: query
         required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              description: |
-                An OJCP `search_jobs` input. Unrecognised fields are ignored rather than
-                refused, per the standard's extensibility rule.
-              properties:
-                query:
-                  type: string
-                location:
-                  type: object
-                  properties:
-                    city: { type: string }
-                    country: { type: string }
-                    remote_ok: { type: boolean }
-                filters:
-                  type: object
-                  properties:
-                    employment_type: { type: string }
-                    experience_level: { type: string }
-                    salary_min: { type: number }
-                    salary_max: { type: number }
-                    posted_within_days: { type: integer }
-                pagination:
-                  type: object
-                  properties:
-                    limit: { type: integer, maximum: 50, default: 10 }
-                    offset: { type: integer, default: 0 }
-                semantic:
-                  type: boolean
-                  description: |
-                    Extension. `true` blends meaning-based ranking into the keyword
-                    search. Needs a non-empty `query`; without one it is reported in
-                    `ignored_params`.
+        description: 'Full-text query over `title`, `company`, `description`, and `location`. Plain words
+          use the default engine matching: the first words are required and trailing ones are dropped
+          when too few postings match, so word order can change the result. Operators: quotes (`"systems
+          engineer"`) require every quoted word in any order (not a contiguous phrase); `-word` excludes;
+          uppercase `OR` between words matches any alternative (at most 5, merged and deduplicated); `title:`
+          at the start of an alternative matches it in the title only, e.g. `title:"product owner" -junior
+          OR title:produktchef`. Narrow the fields of the other alternatives with `q_fields`. Exact-phrase
+          matching is not offered, and default relevance order does not reliably rank a contiguous match
+          above a scattered-token one.'
+        schema:
+          type: string
+        example: golang
+      - name: q_fields
+        in: query
+        required: false
+        description: Comma-separated subset of `title,company,description,location` to restrict `q` to,
+          e.g. `title`. A name outside that set drops the whole parameter (reported in `meta.ignored_params`)
+          rather than partially applying.
+        schema:
+          type: string
+        example: title
+      - name: sort
+        in: query
+        required: false
+        description: One of `created_at`, `posted_at`, `view_count`, `salary_min`, `salary_max`. Omit
+          for relevance/newest.
+        schema:
+          type: string
+        example: posted_at
+      - name: order
+        in: query
+        required: false
+        description: '`asc` or `desc` (default `desc`).'
+        schema:
+          type: string
+        example: desc
+      - name: limit
+        in: query
+        required: false
+        description: Page size, 1–100.
+        schema:
+          type: integer
+        example: '20'
+      - name: offset
+        in: query
+        required: false
+        description: Rows to skip; `offset + limit` ≤ 10000.
+        schema:
+          type: integer
+        example: '0'
       responses:
-        "200":
-          description: An OJCP search-jobs response.
+        '200':
+          description: Success
           content:
             application/json:
               schema:
-                type: object
-                required: [ojcp_version, query, total_results, returned, offset, jobs]
-                properties:
-                  ojcp_version: { type: string }
-                  query: { type: string }
-                  total_results: { type: integer }
-                  returned: { type: integer }
-                  offset: { type: integer }
-                  jobs:
-                    type: array
-                    items:
-                      type: object
-                      description: An OJCP JobPosting.
-                  ignored_params:
-                    type: array
-                    description: Input fields this provider could not honour.
-                    items: { type: string }
-                  semantic:
-                    type: string
-                    enum: [applied, unavailable]
-                    description: |
-                      Extension. Which search answered a request that sent
-                      `semantic: true`; omitted when it did not.
-                  total_is_lower_bound:
-                    type: boolean
-                    description: |
-                      Extension. True on an `applied` semantic answer:
-                      `total_results` is a minimum (what this page reaches, plus
-                      one when there is a next page), not a count of the match.
-        default:
-          $ref: "#/components/responses/Error"
-  /ojcp/v1/jobs/{slug}:
-    get:
-      operationId: ojcpJobDetail
+                type: string
+              example: "{\n              \"data\": [ { \"public_slug\": \"...\", \"title\": \"Senior Go\
+                \ Engineer\", \"...\": \"...\" } ],\n              \"meta\": { \"total\": 137, \"limit\"\
+                : 20, \"offset\": 0 }\n            }"
+      security: []
       tags:
-        - Jobs
-      summary: "OJCP: read one posting"
-      description: |
-        The `get_job_detail` tool, by the `ojcp_id` a search result carries.
-      x-openai-isConsequential: false
-      parameters:
-        - name: slug
-          in: path
-          required: true
-          schema:
-            type: string
-          description: The posting's ojcp_id (its public_slug).
-      responses:
-        "200":
-          description: An OJCP job-detail response.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [ojcp_version, job]
-                properties:
-                  ojcp_version: { type: string }
-                  job:
-                    type: object
-                    description: An OJCP JobPosting.
-        default:
-          $ref: "#/components/responses/Error"
-  /ojcp/v1/employers/{slug}:
-    get:
-      operationId: ojcpEmployerContext
-      tags:
-        - Companies
-      summary: "OJCP: read an employer"
-      description: |
-        The `get_employer_context` tool, by the `ojcp_employer_id` a posting carries.
-        Includes `open_roles_count`, the one figure a single posting cannot state.
-      x-openai-isConsequential: false
-      parameters:
-        - name: slug
-          in: path
-          required: true
-          schema:
-            type: string
-          description: The employer's ojcp_employer_id (its company slug).
-      responses:
-        "200":
-          description: An OJCP employer-context response.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [ojcp_version, employer_id, name]
-                properties:
-                  ojcp_version: { type: string }
-                  employer_id: { type: string }
-                  name: { type: string }
-                  description: { type: string }
-                  industries:
-                    type: array
-                    items: { type: string }
-                  open_roles_count: { type: integer }
-        default:
-          $ref: "#/components/responses/Error"
+      - Jobs
   /jobs/facets:
     get:
-      operationId: getJobFacets
-      tags:
-        - Jobs
-      summary: Get live filter vocabulary and counts
-      description: |
-        Return facet values, counts, canonical skill slugs, and numeric ranges
-        for the postings matching the same filter grammar the search endpoints
-        take. Call this before applying any uncertain filter.
-        `former_employers` is ignored, so facet counts do not narrow to past
-        employers even for signed-in callers.
+      operationId: get_jobs_facets
+      summary: Count of matching jobs per facet value (and numeric stats).
+      description: 'Takes the same `q` and facet filter params as search, but returns the distribution
+        of values instead of a page of jobs — use it to build filter UIs or see how a filter narrows the
+        set. Continuous numeric facets are returned as `stats` (min/max), not per-value buckets.
 
-        A distribution is counted per facet and the wide-valued ones (`cities`,
-        `skills`) dominate, so narrow with `facets=` whenever you read only a few.
-        `company_slug` is outside the default set: name it in `facets=` to get
-        `companies_total` (the exact number of distinct companies matching) and
-        `top_companies` (the 50 with the most matching postings, named). It cannot
-        be combined with `disjunctive`, nor with an `OR` query (400). For a
-        company typeahead use `searchCompanies`.
-      x-openai-isConsequential: false
+
+        Any supported search filter param narrows the counted set. (e.g. `work_mode=remote`)'
       parameters:
-        - $ref: "#/components/parameters/Q"
-        - name: facets
-          in: query
-          schema:
-            type: string
-          description: |
-            Comma-separated facet names to count, e.g. `skills,seniority`. Omit
-            for all of them. An unknown name is a 400. Cannot be combined with
-            `disjunctive`.
-        - name: disjunctive
-          in: query
-          schema:
-            type: boolean
-            default: false
-          description: |
-            Count each facet under the full filter MINUS its own selection, so a
-            selected facet still shows its siblings' counts — the behaviour a
-            live filter sidebar wants. Costs one query per facet.
-        - $ref: "#/components/parameters/Regions"
-        - $ref: "#/components/parameters/Countries"
-        - $ref: "#/components/parameters/Cities"
-        - $ref: "#/components/parameters/Metros"
-        - $ref: "#/components/parameters/WorkMode"
-        - $ref: "#/components/parameters/Category"
-        - $ref: "#/components/parameters/Seniority"
-        - $ref: "#/components/parameters/Skills"
-        - $ref: "#/components/parameters/SkillsMode"
-        - $ref: "#/components/parameters/IsTech"
-        - $ref: "#/components/parameters/RequiresClearance"
-        - $ref: "#/components/parameters/ViaRecruiter"
-        - $ref: "#/components/parameters/Equity"
-        - $ref: "#/components/parameters/ClearanceLevels"
-        - $ref: "#/components/parameters/Perks"
-        - $ref: "#/components/parameters/PerksExclude"
-        - $ref: "#/components/parameters/PerksMode"
-        - $ref: "#/components/parameters/Engagement"
-        - $ref: "#/components/parameters/EngagementExclude"
-        - $ref: "#/components/parameters/ClearanceLevelsExclude"
-        - $ref: "#/components/parameters/EquityExclude"
-        - $ref: "#/components/parameters/AutoApplyAvailable"
-        - $ref: "#/components/parameters/AIArchetype"
-        - $ref: "#/components/parameters/RoleType"
-        - $ref: "#/components/parameters/Collections"
-        - $ref: "#/components/parameters/Reality"
-        - $ref: "#/components/parameters/Source"
-        - $ref: "#/components/parameters/SourceType"
-        - $ref: "#/components/parameters/CompanySlug"
-        - $ref: "#/components/parameters/EmploymentType"
-        - $ref: "#/components/parameters/Relocation"
-        - $ref: "#/components/parameters/EnglishLevel"
-        - $ref: "#/components/parameters/EducationLevel"
-        - $ref: "#/components/parameters/PostingLanguage"
-        - $ref: "#/components/parameters/Domains"
-        - $ref: "#/components/parameters/CompanyType"
-        - $ref: "#/components/parameters/CompanySize"
-        - $ref: "#/components/parameters/SalaryCurrency"
-        - $ref: "#/components/parameters/SalaryPeriod"
-        - $ref: "#/components/parameters/VisaSponsorship"
-        - $ref: "#/components/parameters/SalaryMin"
-        - $ref: "#/components/parameters/SalaryMax"
-        - $ref: "#/components/parameters/ExperienceYearsMin"
-        - $ref: "#/components/parameters/ExperienceYearsMax"
-        - $ref: "#/components/parameters/ExperienceIncludeUnspecified"
-        - $ref: "#/components/parameters/ExperienceOnlySeniorityUnspecified"
-        - $ref: "#/components/parameters/SeniorityIncludeUnspecified"
-        - $ref: "#/components/parameters/PostedWithinDays"
-        - $ref: "#/components/parameters/OpenWithinDays"
-        - $ref: "#/components/parameters/ApplyQuestionsMax"
+      - name: q
+        in: query
+        required: false
+        description: Same full-text query as search.
+        schema:
+          type: string
+        example: golang
       responses:
-        "200":
-          description: Facet distribution for matching jobs.
+        '200':
+          description: Success
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FacetsEnvelope"
-        default:
-          $ref: "#/components/responses/Error"
-  /suggest:
-    get:
-      operationId: getSuggestions
+                type: string
+              example: "{\n              \"data\": {\n                \"total\": 1820,\n             \
+                \   \"facets\": {\n                  \"seniority\": { \"senior\": 640, \"middle\": 410,\
+                \ \"junior\": 120 },\n                  \"category\": { \"backend\": 700, \"frontend\"\
+                : 380 }\n                },\n                \"stats\": {\n                  \"salary_min\"\
+                : { \"min\": 20000, \"max\": 400000 }\n                }\n              }\n          \
+                \  }"
+      security: []
       tags:
-        - Jobs
-      summary: Complete what is being typed into a search box
-      description: |
-        Complete a partly-typed query against the catalogue's own vocabulary:
-        the posting titles it actually carries, plus roles, skills,
-        specializations and companies.
-
-        It completes a PHRASE, not a word. The query is split into the leading
-        phrases already recognised and the trailing fragment still being typed,
-        so `senior software engineer go` completes to Senior Software Engineer at
-        Google rather than starting over. Each row therefore carries EVERY part
-        it names, and applying only one of them discards what the caller typed.
-
-        A `title` part names no facet — apply it as `q`. Every other kind carries
-        a `slug` for its own facet (`skills`, `category`, `company_slug`), and
-        those combine with AND.
-
-        Typos are forgiven in the fragment, not in the recognised phrases: a
-        misspelled phrase falls through to the fragment, where the match is
-        typo-tolerant. An empty `q` returns an empty list — what an empty box
-        should offer is a curated starting point, which is a presentation
-        decision this endpoint does not make.
-      x-openai-isConsequential: false
-      parameters:
-        - name: q
-          in: query
-          schema:
-            type: string
-          description: The partly-typed query. Empty returns no suggestions.
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 20
-            default: 5
-          description: |
-            Rows to return. Clamped rather than rejected: this endpoint is typed
-            into, so an out-of-range value falls back to the default.
-      responses:
-        "200":
-          description: Completions for the typed query.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SuggestionsEnvelope"
-        default:
-          $ref: "#/components/responses/Error"
+      - Jobs
   /jobs/{slug}:
     get:
-      operationId: getJob
-      tags:
-        - Jobs
-      summary: Get a job by slug
-      description: |
-        Full detail for one posting: the verbatim stored description (HTML) and
-        the `ghost` signal, which `agentSearchJobs` does not carry. This is the
-        only endpoint that serves a **closed** posting; `closed_at` is non-null
-        when the role is no longer open.
-      x-openai-isConsequential: false
+      operationId: get_jobs_slug
+      summary: A single job by its public slug (serves closed jobs too).
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Job public_slug.
+      - name: slug
+        in: path
+        required: true
+        description: The job `public_slug`.
+        schema:
+          type: string
+        example: senior-go-engineer-acme-1a2b
       responses:
-        "200":
-          description: Job detail.
+        '200':
+          description: Success
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - data
-                properties:
-                  data:
-                    $ref: "#/components/schemas/Job"
-        default:
-          $ref: "#/components/responses/Error"
+                type: string
+              example: '{ "data": { "public_slug": "senior-go-engineer-acme-1a2b", "title": "Senior Go
+                Engineer", "closed_at": null, "...": "..." } }'
+      security: []
+      tags:
+      - Jobs
   /jobs/{slug}/similar:
     get:
-      operationId: getSimilarJobs
-      tags:
-        - Jobs
-      summary: Find jobs similar to a job
-      description: |
-        Related jobs from the live search index within the same specialization and
-        known location (country and city when available). Uses hybrid text/vector
-        search when the source has an embedding, falling back to keyword search
-        under the same filters. Unknown specialization or location returns an empty
-        list. Closed, private, duplicate and unseen postings are excluded.
-      x-openai-isConsequential: false
+      operationId: get_jobs_slug_similar
+      summary: Similar jobs within the same location and specialization.
+      description: Searches the live Meilisearch index with the source job’s known location and specialization
+        as mandatory filters. Uses stored-vector hybrid ranking when available, falling back to keyword
+        search under the same filters. Returns an empty list when location or specialization is unknown
+        or no visible matches remain.
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Job public_slug.
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 20
-            default: 6
-          description: Maximum similar jobs to return. Values above the maximum are clamped.
+      - name: slug
+        in: path
+        required: true
+        description: The job `public_slug`.
+        schema:
+          type: string
+        example: senior-go-engineer-acme-1a2b
+      - name: limit
+        in: query
+        required: false
+        description: Max similar jobs.
+        schema:
+          type: integer
+        example: '10'
       responses:
-        "200":
-          description: Similar jobs. This response carries no `meta` block.
+        '200':
+          description: Success
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - data
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Job"
-        default:
-          $ref: "#/components/responses/Error"
+                type: string
+              example: '{ "data": [ { "public_slug": "...", "title": "...", "...": "..." } ] }'
+      security: []
+      tags:
+      - Jobs
+  /jobs/{slug}/copies:
+    get:
+      operationId: get_jobs_slug_copies
+      summary: Other open postings in the same role cluster (per-city duplicates).
+      description: The per-city openings folded under one canonical card by content-dedup — each keeps
+        its own `location` and `apply_url` so a seeker picks their city. The anchor job itself is included.
+        `meta.total` is the whole cluster size, so it stays accurate when the list is a capped page.
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        description: The job `public_slug`.
+        schema:
+          type: string
+        example: senior-go-engineer-acme-1a2b
+      - name: limit
+        in: query
+        required: false
+        description: Page size, 1–200 (default 50).
+        schema:
+          type: integer
+        example: '50'
+      - name: offset
+        in: query
+        required: false
+        description: Rows to skip.
+        schema:
+          type: integer
+        example: '0'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: string
+              example: "{\n              \"data\": [\n                {\n                  \"public_slug\"\
+                : \"senior-go-engineer-acme-1a2b\",\n                  \"location\": \"Berlin, Germany\"\
+                ,\n                  \"apply_url\": \"https://boards.greenhouse.io/acme/jobs/123\",\n\
+                \                  \"posted_at\": \"2026-06-18T00:00:00Z\"\n                }\n      \
+                \        ],\n              \"meta\": { \"total\": 4 }\n            }"
+      security: []
+      tags:
+      - Jobs
   /companies:
     get:
-      operationId: searchCompanies
-      tags:
-        - Companies
-      summary: Search companies
-      description: |
-        Companies that currently have at least one open role, most active first.
-        Facet parameters are repeatable (OR within a facet, AND across facets)
-        and compose with `q`.
-
-        `meta.total` is exact whenever any filter is present. On a completely
-        unfiltered request it is a planner **estimate**, because counting the
-        whole catalogue exactly is too expensive to do per request.
-      x-openai-isConsequential: false
+      operationId: get_companies
+      summary: List companies with job counts and denormalized facets; optional filters.
+      description: Most active first. Facet params are repeatable and filter by array overlap (OR within
+        a facet, AND across facets), composably with `q`. `meta.total` reports the count matching the
+        full filter.
       parameters:
-        - name: q
-          in: query
-          schema:
-            type: string
-          description: Case-insensitive company name match.
-        - $ref: "#/components/parameters/Limit"
-        - $ref: "#/components/parameters/Offset"
-        - name: sort
-          in: query
-          schema:
-            type: string
-            enum:
-              - rating
-          description: |
-            `rating` orders by average feedback rating. Omit for the default
-            order (open-role count descending, then name).
-        - name: collections
-          in: query
-          style: form
-          explode: true
-          schema:
-            type: array
-            items:
-              type: string
-          description: Curated collection slugs, e.g. `yc`, `bigtech`, `unicorn`.
-        - name: regions
-          in: query
-          style: form
-          explode: true
-          schema:
-            type: array
-            items:
-              type: string
-          description: Regions the company posts roles in.
-        - name: countries
-          in: query
-          style: form
-          explode: true
-          schema:
-            type: array
-            items:
-              type: string
-          description: Countries the company posts roles in (ISO 3166-1 alpha-2, lowercase).
-        - name: remote_regions
-          in: query
-          style: form
-          explode: true
-          schema:
-            type: array
-            items:
-              type: string
-          description: |
-            Regions the company hires REMOTELY in — derived from its open
-            postings, unlike `regions`, which counts any posting.
-        - name: industries
-          in: query
-          style: form
-          explode: true
-          schema:
-            type: array
-            items:
-              type: string
-          description: Curated company industry slugs, e.g. `fintech`, `developer-tools`.
-        - name: domains
-          in: query
-          style: form
-          explode: true
-          schema:
-            type: array
-            items:
-              type: string
-          description: Job-derived domain slugs (the `domains` job facet, aggregated per company).
-        - name: company_type
-          in: query
-          style: form
-          explode: true
-          schema:
-            type: array
-            items:
-              type: string
-              enum:
-                - product
-                - startup
-                - outsource
-                - outstaff
-                - agency
-                - inhouse
-                - government
-        - name: company_size
-          in: query
-          style: form
-          explode: true
-          schema:
-            type: array
-            items:
-              type: string
-              enum:
-                - 1-10
-                - 11-50
-                - 51-200
-                - 201-500
-                - 501-1000
-                - 1000+
-        - name: maturity
-          in: query
-          style: form
-          explode: true
-          schema:
-            type: array
-            items:
-              type: string
-          description: Curated company maturity stage.
-        - name: yc_batch
-          in: query
-          style: form
-          explode: true
-          schema:
-            type: array
-            items:
-              type: string
-          description: Y Combinator batch, e.g. `W21`. From the curated YC directory.
-        - name: yc_status
-          in: query
-          style: form
-          explode: true
-          schema:
-            type: array
-            items:
-              type: string
-          description: Y Combinator company status, e.g. `Active`, `Acquired`.
-        - name: yc_stage
-          in: query
-          style: form
-          explode: true
-          schema:
-            type: array
-            items:
-              type: string
-          description: Y Combinator funding stage.
-        - name: yc_flags
-          in: query
-          style: form
-          explode: true
-          schema:
-            type: array
-            items:
-              type: string
-          description: Y Combinator directory flags, e.g. `nonprofit`, `top_company`.
+      - name: q
+        in: query
+        required: false
+        description: Case-insensitive name substring filter.
+        schema:
+          type: string
+        example: acme
+      - name: collections
+        in: query
+        required: false
+        description: Curated-collection slug (e.g. `yc`, `bigtech`). Repeatable.
+        schema:
+          type: string
+        example: yc
+      - name: regions
+        in: query
+        required: false
+        description: Region the company hires in. Repeatable.
+        schema:
+          type: string
+        example: eu
+      - name: countries
+        in: query
+        required: false
+        description: ISO 3166-1 alpha-2 country. Repeatable.
+        schema:
+          type: string
+        example: DE
+      - name: industries
+        in: query
+        required: false
+        description: Curated industry. Matches a company through its curated industries **or** the equivalent
+          job-derived domain. Repeatable.
+        schema:
+          type: string
+        example: fintech
+      - name: domains
+        in: query
+        required: false
+        description: Raw job-derived domain, including values no industry names (`other`, `media`, `mobility`).
+          Repeatable.
+        schema:
+          type: string
+        example: fintech
+      - name: company_type
+        in: query
+        required: false
+        description: Company type (e.g. `product`, `outstaff`). Repeatable.
+        schema:
+          type: string
+        example: product
+      - name: company_size
+        in: query
+        required: false
+        description: Size bucket (e.g. `51-200`). Repeatable.
+        schema:
+          type: string
+        example: 51-200
+      - name: remote_regions
+        in: query
+        required: false
+        description: Job-derived remote-hiring region. Repeatable.
+        schema:
+          type: string
+        example: eu
+      - name: yc_batch
+        in: query
+        required: false
+        description: YC batch (e.g. `W21`). Repeatable.
+        schema:
+          type: string
+        example: W21
+      - name: yc_status
+        in: query
+        required: false
+        description: YC company status. Repeatable.
+        schema:
+          type: string
+        example: active
+      - name: yc_stage
+        in: query
+        required: false
+        description: YC funding stage. Repeatable.
+        schema:
+          type: string
+        example: series-a
+      - name: yc_flags
+        in: query
+        required: false
+        description: Curated YC highlight flag. Repeatable.
+        schema:
+          type: string
+        example: hiring
+      - name: maturity
+        in: query
+        required: false
+        description: Company stage/maturity. Repeatable.
+        schema:
+          type: string
+        example: growth
+      - name: subindustries
+        in: query
+        required: false
+        description: YC subindustry leaf (see /companies/subindustries). Repeatable.
+        schema:
+          type: string
+        example: payments
+      - name: limit
+        in: query
+        required: false
+        description: Page size, 1–100.
+        schema:
+          type: integer
+        example: '20'
+      - name: offset
+        in: query
+        required: false
+        description: Rows to skip.
+        schema:
+          type: integer
+        example: '0'
       responses:
-        "200":
-          description: Companies with open-role counts.
+        '200':
+          description: Success
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - data
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/CompanySummary"
-                  meta:
-                    $ref: "#/components/schemas/PaginationMeta"
-        default:
-          $ref: "#/components/responses/Error"
+                type: string
+              example: "{\n              \"data\": [\n                {\n                  \"slug\": \"\
+                acme\",\n                  \"name\": \"Acme\",\n                  \"job_count\": 12,\n\
+                \                  \"collections\": [\"yc\"],\n                  \"regions\": [\"eu\"\
+                ],\n                  \"countries\": [\"DE\"],\n                  \"domains\": [\"fintech\"\
+                ],\n                  \"company_types\": [\"product\"],\n                  \"company_sizes\"\
+                : [\"51-200\"],\n                  \"industries\": [\"payments\"],\n                 \
+                \ \"year_founded\": 2015,\n                  \"employee_count\": 120,\n              \
+                \    \"hq_country\": \"DE\",\n                  \"organization_type\": \"private\",\n\
+                \                  \"tagline\": \"Payments for builders\",\n                  \"company_info\"\
+                : { \"...\": \"...\" },\n                  \"remote_regions\": [\"eu\"],\n           \
+                \       \"yc_batch\": [\"W21\"],\n                  \"yc_status\": [\"active\"],\n   \
+                \               \"yc_stage\": [\"series-a\"],\n                  \"yc_flags\": [\"hiring\"\
+                ],\n                  \"maturity\": \"growth\"\n                }\n              ],\n\
+                \              \"meta\": { \"total\": 1, \"limit\": 20, \"offset\": 0 }\n            }"
+      security: []
+      tags:
+      - Companies
+  /companies/subindustries:
+    get:
+      operationId: get_companies_subindustries
+      summary: Distinct company subindustry vocabulary with company counts.
+      description: Backs the searchable “Industry” facet’s option list, most common first. Counts are
+        unconditional (they do not reflect other active list filters).
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: string
+              example: '{ "data": [ { "value": "payments", "count": 42 }, { "value": "developer-tools",
+                "count": 31 } ] }'
+      security: []
+      tags:
+      - Companies
   /companies/{slug}:
     get:
-      operationId: getCompany
-      tags:
-        - Companies
-      summary: Get company details and open jobs
-      x-openai-isConsequential: false
+      operationId: get_companies_slug
+      summary: A company and a page of its open jobs.
       parameters:
-        - name: slug
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Company slug.
-        - $ref: "#/components/parameters/Limit"
-        - $ref: "#/components/parameters/Offset"
+      - name: slug
+        in: path
+        required: true
+        description: The company slug.
+        schema:
+          type: string
+        example: acme
+      - name: limit
+        in: query
+        required: false
+        description: Page size for the jobs list.
+        schema:
+          type: integer
+        example: '20'
+      - name: offset
+        in: query
+        required: false
+        description: Rows to skip in the jobs list.
+        schema:
+          type: integer
+        example: '0'
       responses:
-        "200":
-          description: Company and its open jobs.
+        '200':
+          description: Success
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - data
-                properties:
-                  data:
-                    type: object
-                    additionalProperties: true
-                    properties:
-                      company:
-                        $ref: "#/components/schemas/CompanyDetail"
-                      jobs:
-                        type: array
-                        items:
-                          $ref: "#/components/schemas/Job"
-                      referral_available:
-                        type: boolean
-                        description: Whether an employee referral offer exists for this company.
-                      parent:
-                        $ref: "#/components/schemas/CompanyRef"
-                      subsidiaries:
-                        type: array
-                        description: |
-                          Companies this one owns. Each is a separate employer with its own
-                          jobs. Omitted when there are none.
-                        items:
-                          $ref: "#/components/schemas/CompanyRef"
-        default:
-          $ref: "#/components/responses/Error"
-  /geo/cities:
+                type: string
+              example: "{\n              \"data\": {\n                \"company\": {\n               \
+                \   \"slug\": \"acme\",\n                  \"name\": \"Acme\",\n                  \"job_count\"\
+                : 12,\n                  \"collections\": [\"yc\"],\n                  \"regions\": [\"\
+                eu\"],\n                  \"countries\": [\"DE\"],\n                  \"domains\": [\"\
+                fintech\"],\n                  \"company_types\": [\"product\"],\n                  \"\
+                company_sizes\": [\"51-200\"],\n                  \"industries\": [\"payments\"],\n  \
+                \                \"year_founded\": 2015,\n                  \"employee_count\": 120,\n\
+                \                  \"hq_country\": \"DE\",\n                  \"organization_type\": \"\
+                private\",\n                  \"tagline\": \"Payments for builders\",\n              \
+                \    \"company_info\": { \"...\": \"...\" },\n                  \"remote_regions\": [\"\
+                eu\"],\n                  \"yc_batch\": [\"W21\"],\n                  \"yc_status\": [\"\
+                active\"],\n                  \"yc_stage\": [\"series-a\"],\n                  \"yc_flags\"\
+                : [\"hiring\"],\n                  \"maturity\": \"growth\"\n                },\n    \
+                \            \"jobs\": [ { \"public_slug\": \"...\", \"title\": \"...\", \"...\": \"...\"\
+                \ } ]\n              }\n            }"
+      security: []
+      tags:
+      - Companies
+  /companies/{slug}/hiring:
     get:
-      operationId: searchCities
-      tags:
-        - Geography
-      summary: Resolve a city name to the canonical cities facet value
-      description: |
-        Typeahead over the city dictionary. The returned `value` is exactly what
-        the `cities` job facet expects — resolve here before filtering, since the
-        facet holds canonical display names ("London") and matches nothing on a
-        near miss.
-
-        City names are not unique: "London" exists in both `gb` and `ca`. The
-        `cities` facet has no country qualifier, so combine it with `countries`
-        only if you accept the OR-group widening described at the top of this
-        schema.
-      x-openai-isConsequential: false
+      operationId: get_companies_slug_hiring
+      summary: How one company hires over time — the company page’s Hiring tab.
+      description: 'The company’s postings added vs. removed per period (dense, missing periods are 0,
+        same window rules as `/stats/jobs-activity`), its open postings now and 30 days ago, and the median
+        days its postings stay open before an employer-side closure over the last 180 days, and the page
+        views its postings drew over the last 30 days and the 30 before (`views`, `views_prev`: one visitor
+        counted once per posting per day, crawlers excluded). `lifetime` is omitted below 5 such closures
+        — absent, never 0. An unknown slug is a `404`; a slug retired by a company merge redirects `301`
+        to the canonical one.'
       parameters:
-        - name: q
-          in: query
-          schema:
-            type: string
-          description: Case-insensitive city name prefix or substring.
-        - name: country
-          in: query
-          schema:
-            type: string
-          description: Restrict matches to one country (ISO 3166-1 alpha-2, lowercase).
-      responses:
-        "200":
-          description: Matching cities. This response carries no `meta` block.
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - data
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/CityMatch"
-        default:
-          $ref: "#/components/responses/Error"
-components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      description: |
-        A full-access API key (`fhk_…`) from https://freehire.me/my/integrations/api-keys. Optional:
-        it raises the rate limit to the account's API plan and changes nothing else.
-  responses:
-    Error:
-      description: Error response.
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/ErrorEnvelope"
-  parameters:
-    Q:
-      name: q
-      in: query
-      schema:
-        type: string
-      description: |
-        Full-text query over `title`, `company`, `description`, and `location`.
-
-        Plain words follow Meilisearch's default matching: the first words
-        are required, and trailing ones are dropped when too few postings
-        match. Word order can therefore change the result (`golang rust` and
-        `rust golang` differ). It is neither a strict AND nor an OR.
-
-        Operators:
-        - `"..."`: every quoted word must match, in any order and position
-          within the matched field. Quoting does **not** request a contiguous
-          phrase match.
-        - `-word` or `-"..."`: exclude postings that match it.
-        - `OR` (uppercase, between words, outside quotes): a posting matching
-          any alternative is a hit. Paging, `sort`, the total and facet counts
-          describe the merged set, and a posting matched twice counts once. At
-          most 5 alternatives; more is a 400.
-        - `title:` at the start of an alternative: match that alternative in
-          the title only, e.g.
-          `title:"product owner" -junior OR title:produktchef`.
-
-        `q_fields` narrows the fields for every alternative that does not
-        start with `title:`.
-
-        Exact-phrase matching is not offered today, and the default relevance
-        order (`sort` omitted) does not reliably rank a contiguous match above
-        a scattered-token one within the same field — the index trades that
-        precision for cheaper indexing over long-form descriptions. A caller
-        that needs phrase precision must currently over-fetch and filter or
-        rank client-side.
-    QFields:
-      name: q_fields
-      in: query
-      schema:
-        type: string
-      description: |
-        Restrict `q` matching to a comma-separated subset of its four
-        searchable fields: `title`, `company`, `description`, `location`. For
-        example `q_fields=title` matches "systems" only in the job title, not
-        in the company name or body — the only lever `q` has to exclude a
-        posting like "STS Systems Defense" from a search for systems engineer
-        roles.
-
-        Naming any field outside that set (e.g. `q_fields=salary`) drops the
-        parameter entirely — `q` runs unrestricted, across all four fields —
-        and `q_fields` is reported in `meta.ignored_params`, the same
-        convention every other unrecognized filter follows.
-    WorkModeRemoteAnywhere:
-      name: work_mode_remote_anywhere
-      in: query
-      schema:
-        type: boolean
-      description: |
-        Changes how `work_mode` composes with the location facets: instead of
-        ANDing them (which narrows remote work to the home geography), the
-        work-mode and location groups become "remote anywhere (or within
-        `work_mode_remote_regions`/`work_mode_remote_countries`), OR a selected
-        physical mode (hybrid, onsite) within the location facets" — remote from anywhere plus
-        hybrid/on-site at home, the profile preference no AND of facets can
-        state. Applied only when `remote` and a physical mode are both selected
-        AND at least one location facet (regions, countries, cities, metros)
-        carries a value; otherwise it changes nothing. Ignored entirely when
-        `work_mode_mode=and` is set. Location excludes (`countries_exclude`)
-        hold in every arm of the disjunction. `false` leaves it off; a value
-        other than `true` or `false` is reported in `meta.ignored_values`.
-    WorkModeRemoteRegions:
-      name: work_mode_remote_regions
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
+      - name: slug
+        in: path
+        required: true
+        description: The company slug.
+        schema:
           type: string
-          enum:
-            - global
-            - north_america
-            - latam
-            - eu
-            - uk
-            - mena
-            - africa
-            - apac
-            - cis
-            - none
-      description: |
-        Bounds the remote arm of `work_mode_remote_anywhere`: remote postings
-        within these regions (expanded exactly as `regions`), while the location
-        facets keep bounding the physical arm. Read only while that modifier is
-        in force; alone it reads nothing. Unknown values are reported in
-        `meta.ignored_values`.
-    WorkModeRemoteCountries:
-      name: work_mode_remote_countries
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
+        example: acme
+      - name: granularity
+        in: query
+        required: false
+        description: One of `day`, `week`, `month` (default `day`).
+        schema:
           type: string
-      description: |
-        Bounds the remote arm of `work_mode_remote_anywhere` by country (ISO
-        3166-1 alpha-2, read as `countries`). ORs with
-        `work_mode_remote_regions`. Read only while that modifier is in force;
-        alone it reads nothing.
-    HideAppliedCompanies:
-      name: hide_applied_companies
-      in: query
-      schema:
-        type: boolean
-      description: |
-        `true` leaves out every posting of an employer the signed-in caller
-        has applied to, through any of its postings. The exclusion is applied
-        inside the search, so `meta.total` and paging describe what is left.
-        It covers the employers of the caller's 1000 most recent applications.
-
-        It is a per-person preference, not a filter: a saved search carrying
-        it narrows nothing. Without a session (or API key), or with a value
-        that is not a boolean, the search runs unhidden and
-        `hide_applied_companies` is reported in `meta.ignored_params`.
-    HideSeen:
-      name: hide_seen
-      in: query
-      schema:
-        type: boolean
-      description: |
-        `true` leaves out the postings the signed-in caller has already
-        opened — the same record that marks a card as viewed. The exclusion
-        is applied inside the search, so `meta.total` and paging describe
-        what is left. It covers the 1000 postings the caller most recently
-        viewed, saved, applied to or hid.
-
-        It is a per-person preference, not a filter: a saved search carrying
-        it narrows nothing. Without a session (or API key), or with a value
-        that is not a boolean, the search runs unhidden and `hide_seen` is
-        reported in `meta.ignored_params`.
-    Limit:
-      name: limit
-      in: query
-      schema:
-        type: integer
-        minimum: 1
-        maximum: 100
-        default: 10
-      description: Page size. Values above the maximum are clamped, not rejected.
-    Offset:
-      name: offset
-      in: query
-      schema:
-        type: integer
-        minimum: 0
-        # No `maximum` here on purpose. The bound is on offset+limit, which JSON Schema
-        # cannot express across two params, and a `maximum: 10000` would be a
-        # machine-readable claim the server does not honour: offset=10000 with any limit
-        # is already a 400. A wrong bound a client generator trusts is worse than no
-        # bound at all — the description below is what states the real one.
-        default: 0
-      description: |
-        Rows to skip. On every list endpoint `offset + limit` may not exceed
-        10000; deeper paging is a 400 ("pagination too deep"), never a clamped
-        page — a 200 carrying rows you did not ask for would leave a client
-        walking pages unable to tell it had reached the end. Narrow with
-        filters rather than paging that far.
-    Sort:
-      name: sort
-      in: query
-      schema:
-        type: string
-        enum:
-          - created_at
-          - posted_at
-          - view_count
-          - salary_min
-          - salary_max
-      description: |
-        Sort field. Omitted, a text query sorts by relevance and an empty query
-        by `posted_at` descending. `view_count` orders by how many people have
-        opened each posting.
-    Order:
-      name: order
-      in: query
-      schema:
-        type: string
-        enum:
-          - asc
-          - desc
-        default: desc
-      description: Sort direction. Ignored without a valid `sort`.
-    DescriptionFormat:
-      name: description_format
-      in: query
-      schema:
-        type: string
-        enum:
-          - html
-          - text
-          - markdown
-        default: html
-      description: |
-        Format of the full description. `html` is the stored verbatim markup;
-        any unrecognized value falls back to it rather than erroring.
-    Semantic:
-      name: semantic
-      in: query
-      schema:
-        type: boolean
-        default: false
-      description: |
-        `true` also matches postings that describe `q` in other words, e.g.
-        "help kids learn to read" finding a reading interventionist. Needs `q`
-        (without it the flag is reported in `meta.ignored_params`) and is not
-        combined with `sort=match`. Use it for a need described in words; leave
-        it off for a job title or a non-technical role — description vectors
-        cover technical roles only, and there plain keywords answer better.
-    Regions:
-      name: regions
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - global
-            - north_america
-            - latam
-            - eu
-            - uk
-            - mena
-            - africa
-            - apac
-            - cis
-            - none
-      description: |
-        Macro-regions. Country codes are NOT regions — use `countries`. `none`
-        is the reserved value for postings with no resolved geography. Joins the
-        geography OR-group with `countries`, `cities` and `metros`.
-    Countries:
-      name: countries
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-      description: |
-        ISO 3166-1 alpha-2, lowercase (`gb`, `de`). Matching is
-        case-insensitive. Joins the geography OR-group.
-    Cities:
-      name: cities
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-      description: |
-        Canonical city display names ("London", "Berlin") are accepted. Recognized
-        dictionary aliases such as "München" and "Köln" are also accepted and
-        resolved to the canonical name. Unknown values stay verbatim. Use
-        `searchCities` to discover or disambiguate city names. Joins the geography
-        OR-group.
-    Metros:
-      name: metros
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-      description: |
-        Metro areas ("Sacramento (US)", "Moscow (RU)") — commuting zones from GHS-FUA.
-        A posting is in a metro when its location names a city inside it. Joins the geography
-        OR-group.
-    WorkMode:
-      name: work_mode
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - remote
-            - hybrid
-            - onsite
-      description: |
-        Work format, resolved from a deterministic dictionary. Absent on a
-        posting whose format could not be resolved, so this filter narrows to
-        postings that stated it.
-
-        Set `work_mode_remote_anywhere=true` alongside this to keep remote
-        postings from anywhere while the physical modes stay bounded by the
-        location facets (regions, countries, cities, metros) — "remote from
-        anywhere, hybrid/on-site at home". Applied only when `remote` and a
-        physical mode are both selected AND at least one location facet carries
-        a value; otherwise it changes nothing, and it is ignored entirely when
-        `work_mode_mode=and` is set. Location EXCLUDES hold in every arm of the
-        resulting disjunction (`countries_exclude=us` drops US postings in all
-        modes). `false` leaves it off; a value other than `true` or `false` is
-        reported in `meta.ignored_values`.
-    Category:
-      name: category
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-      description: Role category slug from `getJobFacets`.
-    Seniority:
-      name: seniority
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - intern
-            - junior
-            - middle
-            - senior
-            - lead
-            - staff
-            - principal
-            - c_level
-    Skills:
-      name: skills
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-      description: Canonical skill slugs from `getJobFacets`. A known alias (`golang`) is read as its canonical slug (`go`); an unknown value is named in `meta.ignored_values`. Never invent one.
-    SkillsMode:
-      name: skills_mode
-      in: query
-      schema:
-        type: string
-        enum:
-          - and
-      description: |
-        `and` requires a posting to carry EVERY listed skill instead of any of
-        them. The same `<facet>_mode=and` switch works on any non-geography
-        facet.
-    RequiresClearance:
-      name: requires_clearance
-      in: query
-      schema:
-        type: boolean
-      description: |
-        Whether the posting states a government security-clearance requirement
-        (UK SC/DV/BPSS, US Secret/TS-SCI/polygraph, AU baseline/NV1), derived
-        deterministically from the description.
-
-        `false` returns every posting NOT marked as requiring one — including the
-        vast majority, where the description says nothing about clearance. It is
-        the "hide the jobs I cannot be hired into" filter, not an assertion that
-        those postings promise no clearance is needed.
-
-        `true` returns only the marked postings, for a cleared candidate seeking
-        exactly that work. Omitting the parameter filters nothing.
-    FormerEmployers:
-      name: former_employers
-      in: query
-      schema:
-        type: boolean
-      description: |
-        "Hiring again": only postings at companies the signed-in caller has
-        worked at and left, as recorded in their own experience bank (current
-        roles and projects are not former employers). Combines with every other
-        filter; `meta.total` counts the narrowed result.
-
-        A banked company name counts only when it resolves to exactly one
-        catalogue company carrying open jobs. Names that name no employer
-        ("Freelance", "Confidential"), names two catalogue companies share, and
-        short names whose banked location does not match a country the company
-        hires in are left out — a missing company is preferred to a stranger
-        under a familiar name. When nothing resolves the answer is empty, never
-        the whole catalogue.
-
-        Read only for a signed-in caller (session cookie or API key). Anonymous, it filters
-        nothing and is reported in `meta.ignored_params`. `false` filters
-        nothing.
-    ViaRecruiter:
-      name: via_recruiter
-      in: query
-      schema:
-        type: boolean
-      description: |
-        Whether the posting states that it is published by an intermediary on a
-        client's behalf — a staffing agency or recruiter ("on behalf of our
-        client", "our client is a ..."), derived deterministically from the
-        description.
-
-        `false` returns every posting NOT marked — including recruiter postings
-        that never say so. It is the "hide recruiter posts" filter, not an
-        assertion that the rest were posted by the employer.
-
-        `true` returns only the marked postings. Omitting the parameter filters
-        nothing.
-    ClearanceLevelsExclude:
-      name: clearance_levels_exclude
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - none
-            - confidential
-            - secret
-            - top_secret
-            - ts_sci
-            - public_trust
-            - interim
-            - other
-      description: |
-        Exclude postings matching these clearance levels. `none` keeps only postings that state a clearance.
-    ClearanceLevels:
-      name: clearance_levels
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - none
-            - confidential
-            - secret
-            - top_secret
-            - ts_sci
-            - public_trust
-            - interim
-            - other
-      description: |
-        The security-clearance levels the posting states, derived
-        deterministically from the description. Values OR together.
-
-        The US ladder is `confidential`, `secret`, `top_secret`, `ts_sci` and
-        `public_trust`. `interim` marks a posting that accepts an interim
-        clearance; it is stated beside a level, not instead of one. `other` is a
-        non-US scheme (UK SC/DV/BPSS, AU Baseline/NV1, NATO) or a clearance
-        stated with no level at all. A posting may carry several values.
-
-        `none` selects the postings with no detected clearance requirement —
-        exactly the postings `requires_clearance=false` returns — and ORs with
-        real levels like any other value. `clearance_levels_exclude=none` keeps
-        only the postings that state a clearance.
-    Engagement:
-      name: engagement
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - ir35_outside
-            - ir35_inside
-            - w2
-            - "1099"
-            - c2c
-            - contract_to_hire
-            - b2b
-            - uop
-            - umowa_zlecenie
-            - umowa_o_dzielo
-            - clt
-            - pj
-            - tk
-            - gph
-            - samozanyaty
-            - ip
-            - freiberuflich
-            - arbeitnehmerueberlassung
-            - zzp
-            - auto_entrepreneur
-            - portage_salarial
-            - autonomo
-            - monotributo
-      description: |
-        The legal terms the posting states it engages its worker on —
-        employee or own business, and on what tax footing — matched
-        deterministically from the title and description, and from a source's
-        own contract-type field where it has one (Brazilian boards' CLT/PJ
-        picklist); never inferred,
-        each in its market's own term: UK `ir35_outside` / `ir35_inside`; US
-        `w2`, `1099`, `c2c`; `contract_to_hire`; Poland and Central Europe
-        `b2b`, `uop`, `umowa_zlecenie`, `umowa_o_dzielo`; Brazil `clt`, `pj`;
-        Russia and the CIS `tk` (трудовой договор), `gph`, `samozanyaty`,
-        `ip`; Germany `freiberuflich`, `arbeitnehmerueberlassung` (agency
-        employment); Netherlands `zzp`; France `auto_entrepreneur`,
-        `portage_salarial`; Spain `autonomo`; Argentina `monotributo`. A
-        posting offering several carries each; one that does not say carries
-        none. Separate from `employment_type`, which says how long and how
-        many hours. Values OR.
-    EngagementExclude:
-      name: engagement_exclude
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - ir35_outside
-            - ir35_inside
-            - w2
-            - "1099"
-            - c2c
-            - contract_to_hire
-            - b2b
-            - uop
-            - umowa_zlecenie
-            - umowa_o_dzielo
-            - clt
-            - pj
-            - tk
-            - gph
-            - samozanyaty
-            - ip
-            - freiberuflich
-            - arbeitnehmerueberlassung
-            - zzp
-            - auto_entrepreneur
-            - portage_salarial
-            - autonomo
-            - monotributo
-      description: |
-        Exclude postings that state any of the selected terms. A posting that
-        does not say is kept.
-    PerksExclude:
-      name: perks_exclude
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - generous_pto
-            - four_day_week
-            - 401k_match
-            - parental_leave
-            - retirement_plan
-            - tuition_reimbursement
-            - unlimited_pto
-            - health_insurance
-            - mental_health
-            - learning_budget
-            - home_office_stipend
-            - sabbatical
-            - sign_on_bonus
-      description: |
-        Exclude postings that mention any of the selected perks.
-    Perks:
-      name: perks
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - generous_pto
-            - four_day_week
-            - 401k_match
-            - parental_leave
-            - retirement_plan
-            - tuition_reimbursement
-            - unlimited_pto
-            - health_insurance
-            - mental_health
-            - learning_budget
-            - home_office_stipend
-            - sabbatical
-            - sign_on_bonus
-      description: |
-        Benefits the posting's description states it offers, matched
-        deterministically from explicit text (never inferred). A posting
-        carrying no perk means its description names none of these — most
-        employers list only part of their package — not that it offers none.
-        `generous_pto` is the employer's own "generous"/"unlimited"/"flexible"
-        wording or a stated allowance of 25+ days; `unlimited_pto` is a subset
-        of it. `retirement_plan` covers non-US forms (pension, superannuation,
-        RRSP). Values OR by default; `perks_mode=and` requires every one.
-        Visa sponsorship and relocation are separate filters
-        (`visa_sponsorship`, `relocation`).
-    PerksMode:
-      name: perks_mode
-      in: query
-      schema:
-        type: string
-        enum:
-          - and
-      description: |
-        `and` requires a posting to mention EVERY listed perk instead of any
-        of them.
-    EquityExclude:
-      name: equity_exclude
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - salary_and_equity
-            - equity_only
-            - not_stated
-      description: |
-        Exclude postings matching these equity values. `not_stated` keeps only postings that state equity compensation.
-    Equity:
-      name: equity
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - salary_and_equity
-            - equity_only
-            - not_stated
-      description: |
-        What the posting states about equity compensation, derived
-        deterministically from its title and description.
-
-        `salary_and_equity` — equity (stock options, RSUs, an equity grant,
-        ESOP, VSOP/phantom shares) offered beside cash pay; a salary figure is
-        not required. `equity_only` — the posting states that equity is the
-        whole compensation. `not_stated` — neither was read, which is NOT a
-        statement that the job offers no equity. An employee stock PURCHASE
-        plan does not count as equity.
-
-        Repeated values are ORed; `equity_exclude=<value>` excludes one
-        (`equity_exclude=not_stated` keeps every posting that states equity).
-    AutoApplyAvailable:
-      name: auto_apply_available
-      in: query
-      schema:
-        type: boolean
-      description: |
-        Whether the posting's ATS provider is one freehire's auto-apply feature
-        can currently attempt to fill and submit for. A best-effort,
-        provider-eligibility signal only — a marked posting can still park on a
-        live obstacle (a captcha, an unrecognized form layout, missing
-        candidate answers) discovered only when an attempt actually runs, never
-        a guarantee of successful submission.
-
-        `true` returns only the marked postings. Omitting the parameter filters
-        nothing.
-    IsTech:
-      name: is_tech
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - tech
-            - non_tech
-      description: |
-        Technical vs non-technical, derived deterministically from title and
-        category. Absent when unknown, so the filter never guesses.
-    AIArchetype:
-      name: ai_archetype
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - rag_app_builder
-            - agent_builder
-            - cloud_ml_platform_engineer
-            - ml_trainer_researcher
-            - fullstack_ai_engineer
-            - devops_infra_engineer
-      description: AI skill-signature archetype, derived from the posting's skill set.
-    RoleType:
-      name: role_type
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - people_manager
-      description: |
-        Whether the posting names a people-management role, resolved from its title.
-
-        The vocabulary holds ONE value on purpose. A posting carrying
-        `people_manager` is a management role; a posting carrying **nothing** means
-        no management marker was found in the title — it does **not** mean the
-        posting is an individual-contributor role. That side is not detectable from
-        a title and this API does not claim it.
-
-        So `role_type_exclude=people_manager` returns "postings with no management
-        marker", which is a wider and weaker set than "individual-contributor
-        postings". Do not present it to users as the latter.
-    Collections:
-      name: collections
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-      description: |
-        Curated collection slugs of the posting's company, e.g. `yc`,
-        `bigtech`, `unicorn`, `us-h1b-sponsor`. Read the live set from
-        `getJobFacets`.
-    Reality:
-      name: reality
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - fresh
-            - stale
-            - likely-evergreen
-      description: |
-        Posting-reality class. `fresh` is recently posted and not obviously
-        recycled; `stale` is old; `likely-evergreen` reads as an always-open
-        pipeline ad. A large share of the catalogue is `stale`, so `?reality=fresh`
-        is the cheapest quality filter available. Read the live split from
-        `getJobFacets`.
-    Source:
-      name: source
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-      description: |
-        Origin slug of the posting — the ATS or board it was crawled from
-        (`greenhouse`, `workday`, `adzuna`, …). Read the live set from
-        `getJobFacets`. Pair with `source_exclude` to avoid double-counting a
-        board you already query directly.
-    CompanySlug:
-      name: company_slug
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-      description: |
-        Company slugs from `searchCompanies`. This facet has no distribution in
-        `getJobFacets` — use the company search for a typeahead.
-    EmploymentType:
-      name: employment_type
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - full_time
-            - part_time
-            - contract
-            - internship
-            - fellowship
-    Relocation:
-      name: relocation
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - not_supported
-            - supported
-            - required
-    EnglishLevel:
-      name: english_level
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - none
-            - a1
-            - a2
-            - b1
-            - b2
-            - c1
-            - c2
-            - native
-    EducationLevel:
-      name: education_level
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - none
-            - bachelor
-            - master
-            - phd
-    PostingLanguage:
-      name: posting_language
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-      description: Language the posting is written in (ISO 639-1, e.g. `en`, `de`, `uk`).
-    Domains:
-      name: domains
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - fintech
-            - crypto
-            - ecommerce
-            - gambling
-            - gamedev
-            - media
-            - travel
-            - healthcare
-            - edtech
-            - govtech
-            - devtools
-            - cybersecurity
-            - ai
-            - hrtech
-            - adtech
-            - proptech
-            - logistics
-            - mobility
-            - climatetech
-            - other
-      description: Business domain of the hiring company, as stated by the posting.
-    CompanyType:
-      name: company_type
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - product
-            - startup
-            - outsource
-            - outstaff
-            - agency
-            - inhouse
-            - government
-    CompanySize:
-      name: company_size
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - 1-10
-            - 11-50
-            - 51-200
-            - 201-500
-            - 501-1000
-            - 1000+
-    SalaryCurrency:
-      name: salary_currency
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-      description: ISO 4217 code, e.g. `USD`, `EUR`.
-    SalaryPeriod:
-      name: salary_period
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - year
-            - month
-            - day
-            - hour
-    VisaSponsorship:
-      name: visa_sponsorship
-      in: query
-      schema:
-        type: boolean
-      description: |
-        Whether the posting states it sponsors a visa. `false` is a real,
-        stated value, not "unknown" — postings that say nothing match neither
-        setting.
-    SalaryMin:
-      name: salary_min
-      in: query
-      schema:
-        type: integer
-      description: |
-        Lower bound on the posting's minimum salary, in its own
-        `salary_currency` and `salary_period` — the comparison does NOT
-        normalize currencies. Pair with `salary_currency` and `salary_period` for
-        a meaningful range.
-    SalaryMax:
-      name: salary_max
-      in: query
-      schema:
-        type: integer
-      description: Upper bound on the posting's maximum salary. Same currency caveat as `salary_min`.
-    ExperienceYearsMin:
-      name: experience_years_min
-      in: query
-      schema:
-        type: integer
-      description: >-
-        Lower bound on the years of experience the posting asks for. Pairs with
-        `experience_years_max` as a closed range over that one figure. A posting
-        that states no experience requirement carries no figure and is therefore
-        excluded by either bound, unless `experience_include_unspecified=true`.
-    ExperienceYearsMax:
-      name: experience_years_max
-      in: query
-      schema:
-        type: integer
-        minimum: 0
-      description: >-
-        Upper bound on the years of experience the posting asks for — the most you
-        are willing to be asked for. It bounds the same figure `experience_years_min`
-        bounds from below, not a second field. `experience_years_max=0` selects the
-        postings that state no prior experience is required. Like `experience_years_min`,
-        it excludes postings that state no requirement at all, unless
-        `experience_include_unspecified=true`.
-    ExperienceIncludeUnspecified:
-      name: experience_include_unspecified
-      in: query
-      schema:
-        type: boolean
-      description: >-
-        With either experience bound, also keep the postings that state no
-        experience requirement — most of the catalogue, which a bound
-        otherwise excludes. Has no effect without a bound.
-    ExperienceOnlySeniorityUnspecified:
-      name: experience_only_seniority_unspecified
-      in: query
-      schema:
-        type: boolean
-      description: >-
-        Apply either experience bound only to the postings that carry no seniority
-        level; a posting with a level passes the bound whatever it states. With
-        `seniority` and `seniority_include_unspecified=true` this reads "one of these
-        levels, or no level and within the bound". Has no effect without a bound.
-    SeniorityIncludeUnspecified:
-      name: seniority_include_unspecified
-      in: query
-      schema:
-        type: boolean
-      description: >-
-        With `seniority`, also keep the postings that carry no seniority level —
-        most of the catalogue, which including a level otherwise excludes. Has no
-        effect without an included seniority.
-    PostedWithinDays:
-      name: posted_within_days
-      in: query
-      schema:
-        type: integer
-        minimum: 1
-        maximum: 36500
-      description: >-
-        Restrict to postings whose SOURCE states a publication date within the last N
-        days. Omit for no restriction. Some boards restate this date on every crawl, so
-        a posting that has been open for months can satisfy a narrow bound here — see
-        `open_within_days` for the date that cannot be rewritten from outside. The two
-        are independent and AND together.
-    OpenWithinDays:
-      name: open_within_days
-      in: query
-      schema:
-        type: integer
-        minimum: 1
-        maximum: 36500
-      description: >-
-        Restrict to postings first recorded by this system within the last N days — how
-        long the posting has been in the catalogue, regardless of what date its source
-        states. Omit for no restriction. This is the bound to use for "nothing that has
-        been sitting here for months"; `posted_within_days` answers the different
-        question of what the board claims.
-    ApplyQuestionsMax:
-      name: apply_questions_max
-      in: query
-      schema:
-        type: integer
-        minimum: 0
-      description: >-
-        Keep postings whose application form requires at most N questions beyond the
-        standard fields every form asks for (name, contact details, CV, cover letter) —
-        the posting's `apply_questions`. `3` is the "short form" filter. A posting with
-        no `apply_questions` (no form freehire could read) is EXCLUDED: an unknown
-        form is not a short one. A value that is not a non-negative integer imposes no
-        bound and is named in `meta.ignored_values`.
-    RegionsExclude:
-      name: regions_exclude
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-      description: Regions to exclude. Excludes AND together, unlike included geography.
-    CountriesExclude:
-      name: countries_exclude
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-      description: Countries to exclude.
-    WorkModeExclude:
-      name: work_mode_exclude
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-      description: Work formats to exclude, e.g. `onsite`.
-    RoleTypeExclude:
-      name: role_type_exclude
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - people_manager
-      description: >-
-        Role types to exclude. Declared explicitly, unlike most `_exclude` twins,
-        because with a one-value vocabulary the exclusion is the primary way to use
-        this facet: `role_type_exclude=people_manager` returns the postings whose
-        title carries no management marker. That is a wider and weaker set than
-        "individual-contributor postings" — it also holds every management role the
-        title dictionary missed — so do not present it to users as the latter.
-    SkillsExclude:
-      name: skills_exclude
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-      description: Skill slugs to exclude.
-    SourceType:
-      name: source_type
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - ats
-            - company
-            - aggregator
-            - social
-      description: |
-        What kind of source the posting was read from:
-
-        - `ats` — a multi-tenant applicant tracking system (`greenhouse`, `lever`,
-          `workday`, …), so the employer's own posting;
-        - `company` — one employer's own careers site, or a vacancy a verified
-          employer published on freehire;
-        - `aggregator` — a board that republishes postings from many companies
-          (`adzuna`, `whatjobs`, …);
-        - `social` — a posting shared in a community channel (Hacker News "Who is
-          hiring?", Telegram).
-
-        Repeated values are ORed: `source_type=ats&source_type=company` keeps the
-        original postings only. A source none of these describes (a hand-curated
-        import, a pasted link) carries no value and is left out by any positive
-        `source_type` filter; reach it through `source`. Duplicates across sources are
-        already collapsed to one canonical posting, so this narrows WHERE postings
-        come from rather than removing copies.
-    SourceTypeExclude:
-      name: source_type_exclude
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-          enum:
-            - ats
-            - company
-            - aggregator
-            - social
-      description: >-
-        Source types to exclude. `source_type_exclude=aggregator` drops every
-        aggregator's posting, the shortest way to ask for originals.
-    SourceExclude:
-      name: source_exclude
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-      description: Source slugs to exclude.
-    CompanySlugExclude:
-      name: company_slug_exclude
-      in: query
-      style: form
-      explode: true
-      schema:
-        type: array
-        items:
-          type: string
-      description: Company slugs to exclude.
-  schemas:
-    Job:
-      type: object
-      additionalProperties: true
-      required:
-        - public_slug
-        - title
-        - company
-      properties:
-        public_slug:
-          type: string
-          description: Stable public identifier. The freehire page is https://freehire.me/jobs/{public_slug}.
-        title:
-          type: string
-        company:
-          type: string
-        company_slug:
-          type: string
-        url:
-          type: string
-          description: |
-            The employer's own application URL. This is where an applicant goes.
-            Empty when `direct_apply` is true: that vacancy has no page elsewhere.
-        direct_apply:
-          type: boolean
-          description: |
-            True for a vacancy its employer published on freehire that takes
-            applications only on its freehire page (`https://freehire.me/jobs/{slug}`).
-            Absent for every other posting.
-        location:
-          type: string
-          description: The posting's own location string, verbatim and unnormalized. Filter on the geography facets instead.
-        source:
-          type: string
-          description: Origin slug — the ATS or board this posting was crawled from.
-        external_id:
-          type: string
-          description: The source's own identifier for the posting.
-        application_deadline:
+        example: week
+      - name: from
+        in: query
+        required: false
+        description: Start date (UTC). Defaults to a per-granularity window before `to`.
+        schema:
           type: string
           format: date
-          description: Source-stated last application day, inclusive. Absent when the source states no deadline.
-        manually_added:
-          type: boolean
-          description: True for a hand-curated posting rather than an automated crawl.
-        description:
+        example: '2026-01-01'
+      - name: to
+        in: query
+        required: false
+        description: End date (UTC). Defaults to today.
+        schema:
           type: string
-          description: |
-            Stored verbatim HTML by default. `searchJobs` serves a truncated
-            preview; `agentSearchJobs` and `getJob` serve the full body, and
-            `agentSearchJobs` can convert it via `description_format`.
-        regions:
-          type: array
-          items:
-            type: string
-        countries:
-          type: array
-          items:
-            type: string
-        cities:
-          type: array
-          items:
-            type: string
-        metros:
-          type: array
-          items:
-            type: string
-        work_mode:
+          format: date
+        example: '2026-06-30'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: string
+              example: "{\n              \"data\": {\n                \"open\": 42,\n                \"\
+                open_prev\": 30,\n                \"growth\": 12,\n                \"views\": 2114,\n\
+                \                \"views_prev\": 1800,\n                \"series\": [\n              \
+                \    { \"period\": \"2026-06-01\", \"added\": 5, \"removed\": 2 },\n                 \
+                \ { \"period\": \"2026-06-08\", \"added\": 3, \"removed\": 4 }\n                ],\n \
+                \               \"lifetime\": { \"closed\": 37, \"median_days\": 21.5 }\n            \
+                \  }\n            }"
+      security: []
+      tags:
+      - Companies
+  /companies/{slug}/closed-jobs:
+    get:
+      operationId: get_companies_slug_closed_jobs
+      summary: A company’s closed postings — the company page’s Closed tab.
+      description: 'A page of the postings the company has closed, most recently closed first. Closed
+        postings are not in search, so this is the only list of them. There is no total: `meta.has_more`
+        says whether another page follows. Paging reaches the first 2000 rows (`offset + limit` ≤ 2000);
+        a deeper page is a `400`. An unknown slug is a `404`; a slug retired by a company merge redirects
+        `301` to the canonical one.'
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        description: The company slug.
+        schema:
           type: string
-          enum:
-            - remote
-            - hybrid
-            - onsite
-          description: Absent when the posting's format could not be resolved.
-        skills:
-          type: array
-          items:
-            type: string
-        collections:
-          type: array
-          items:
-            type: string
-          description: Curated collection slugs of the posting's company.
-        is_tech:
-          type: string
-          enum:
-            - tech
-            - non_tech
-          description: Absent when unknown.
-        requires_clearance:
-          type: boolean
-          description: |
-            Present and `true` only when the posting states a government
-            security-clearance requirement. Absent otherwise — there is no
-            `false`, because "no requirement was detected" is not the same claim
-            as "this posting needs no clearance".
-        via_recruiter:
-          type: boolean
-          description: |
-            Present and `true` only when the posting states that it is published
-            by an intermediary on a client's behalf. Absent otherwise — a
-            recruiter who never says so is not detected, so absence does not
-            mean the employer posted it.
-        equity:
-          type: string
-          enum:
-            - salary_and_equity
-            - equity_only
-          description: |
-            What the posting states about equity compensation:
-            `salary_and_equity` (offered beside cash pay) or `equity_only`
-            (equity is the whole pay). Absent when the posting states neither —
-            "not stated", not "no equity".
-        clearance_levels:
-          type: array
-          items:
-            type: string
-            enum:
-              - confidential
-              - secret
-              - top_secret
-              - ts_sci
-              - public_trust
-              - interim
-              - other
-          description: |
-            The security-clearance levels the posting states. Present exactly
-            when `requires_clearance` is, absent otherwise. `other` is a non-US
-            scheme or a clearance stated with no level.
-        perks:
-          type: array
-          items:
-            type: string
-          description: |
-            Benefits the description states it offers (see the `perks` filter
-            for the vocabulary). Empty when it names none of them — not a claim
-            that the job offers none.
-        engagement:
-          type: array
-          items:
-            type: string
-          description: |
-            The legal terms the posting states it engages its worker on (see
-            the `engagement` filter for the vocabulary). Empty when it does not
-            say.
-        auto_apply_available:
-          type: boolean
-          description: |
-            Present and `true` only when the posting's ATS provider is one
-            freehire's auto-apply feature can currently attempt to fill and
-            submit for. Absent otherwise — a best-effort provider-eligibility
-            signal, never a guarantee of successful submission.
-        apply_questions:
+        example: acme
+      - name: limit
+        in: query
+        required: false
+        description: Page size (max 100).
+        schema:
           type: integer
-          minimum: 0
-          description: |
-            How many questions the posting's application form REQUIRES beyond the
-            standard fields every form asks for (name, contact details, CV, cover
-            letter), counted from the form freehire captured from the employer's
-            ATS. Optional questions, the equal-opportunity survey and consent boxes
-            are not counted. `0` means no REQUIRED question beyond the basics
-            (the form may still offer optional ones). Absent when freehire holds
-            no form for the posting (none captured from its ATS, and none written
-            for a vacancy taking applications on freehire) — "not known", never
-            "long".
-            Served by search hits and the job detail; a list read straight from
-            the database may omit it.
-        posted_at:
-          type: string
-          format: date-time
-          nullable: true
-        created_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: When freehire first saw the posting.
-        updated_at:
-          type: string
-          format: date-time
-          nullable: true
-        last_seen_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: When a re-crawl last confirmed the posting was still live.
-        closed_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: Non-null once the posting is no longer open. Only `getJob` ever serves such a row.
-        enrichment:
-          $ref: "#/components/schemas/Enrichment"
-        enriched_at:
-          type: string
-          format: date-time
-          nullable: true
-        enrichment_version:
+        example: '20'
+      - name: offset
+        in: query
+        required: false
+        description: Rows to skip; `offset + limit` may not exceed 2000.
+        schema:
           type: integer
-          nullable: true
-          description: Bumped when the enrichment contract changes — use it to detect re-enriched rows.
-        my_vote:
+        example: '0'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: string
+              example: "{\n              \"data\": [{ \"public_slug\": \"backend-engineer-acme-1a2b3c4d\"\
+                , \"title\": \"Backend Engineer\", \"closed_at\": \"2026-10-01T09:00:00Z\" }],\n     \
+                \         \"meta\": { \"limit\": 20, \"offset\": 0, \"has_more\": true }\n           \
+                \ }"
+      security: []
+      tags:
+      - Companies
+  /geo/cities:
+    get:
+      operationId: get_geo_cities
+      summary: Prefix-search city names for autocomplete.
+      description: Population-ranked prefix search over the embedded city dictionary, optionally narrowed
+        to one country. A blank `q` returns an empty list.
+      parameters:
+      - name: q
+        in: query
+        required: false
+        description: Prefix to match.
+        schema:
+          type: string
+        example: berl
+      - name: country
+        in: query
+        required: false
+        description: ISO 3166-1 alpha-2 code to narrow to.
+        schema:
+          type: string
+        example: DE
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: string
+              example: '{ "data": [ { "value": "Berlin", "country": "DE" } ] }'
+      security: []
+      tags:
+      - Geography
+  /suggest:
+    get:
+      operationId: get_suggest
+      summary: Complete a partially typed job or company query.
+      description: Returns at most 20 suggestions. An empty query returns an empty list.
+      parameters:
+      - name: q
+        in: query
+        required: false
+        description: Text to complete.
+        schema:
+          type: string
+        example: gol
+      - name: limit
+        in: query
+        required: false
+        description: Maximum results, default 5 and capped at 20.
+        schema:
           type: integer
-          nullable: true
-          description: The calling user's vote. Always null on this unauthenticated schema.
-        reality:
-          $ref: "#/components/schemas/Reality"
-        ghost:
-          $ref: "#/components/schemas/Ghost"
-        view_count:
-          type: integer
-        applied_count:
-          type: integer
-        upvote_count:
-          type: integer
-        downvote_count:
-          type: integer
-    Enrichment:
-      type: object
-      additionalProperties: true
-      description: |
-        Model-extracted attributes, every field omitted when the posting did not
-        state it. `work_mode`, `regions`, `countries`, `cities` and `skills` are
-        deliberately NOT here — those are served top-level from the
-        deterministic dictionaries, and the model's own values for them are not
-        published.
-      properties:
-        summary:
-          type: string
-          description: The one synthesized field — a 1-2 sentence synopsis, always present on an enriched posting.
-        employment_type:
-          type: string
-        relocation:
-          type: string
-        visa_sponsorship:
-          type: boolean
-        timezone_note:
-          type: string
-        salary_min:
-          type: integer
-        salary_max:
-          type: integer
-        salary_currency:
-          type: string
-        salary_period:
-          type: string
-        seniority:
-          type: string
-        experience_years_min:
-          type: integer
-        english_level:
-          type: string
-        education_level:
-          type: string
-        category:
-          type: string
-        domains:
-          type: array
-          items:
-            type: string
-        posting_language:
-          type: string
-        company_type:
-          type: string
-        company_size:
-          type: string
-    Ghost:
-      type: object
-      nullable: true
-      additionalProperties: true
-      description: |
-        Hedged "is anyone actually hiring for this" verdict, raised only when
-        evidence fires — most postings carry `null`, so an absent value means
-        "no signal", never "verified real".
+        example: '10'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: string
+              example: '{ "data": [{ "text": "golang", "type": "skill", "count": 42 }], "meta": { "count":
+                1 } }'
+      security: []
+      tags:
+      - Suggestions and live feed
+  /feed/recent:
+    get:
+      operationId: get_feed_recent
+      summary: Stream recent catalogue activity using Server-Sent Events.
+      description: Replays the current feed backlog on connect, then sends new entries and periodic ping
+        events. The connection remains open until the client disconnects.
+      responses:
+        '200':
+          description: Success
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              example: 'event: job
 
-        Attached by `searchJobs`, `getJob` and the plain jobs list. NOT attached
-        by `agentSearchJobs` or `getSimilarJobs`, so its absence on those two is
-        not evidence either way.
-      properties:
-        level:
-          type: string
-          description: How strongly the evidence reads, e.g. `possible`.
-        criteria:
-          type: array
-          items:
-            type: string
-          description: Which criteria fired, e.g. `evergreen_posting`, `ats_absent`.
-        criteria_total:
-          type: integer
-          description: How many criteria exist, so `criteria` reads as N-of-total.
-        contributors:
-          type: integer
-          description: Number of independent user reports, once past the disclosure gate.
-        ats_checked_at:
-          type: string
-          format: date-time
-          description: When the posting was last looked for on the employer's own ATS. Present only when the `ats_absent` criterion fired.
-    Reality:
-      type: object
-      additionalProperties: true
-      description: Signals about whether the posting reflects a real, current opening.
-      properties:
-        class:
-          type: string
-          enum:
-            - fresh
-            - stale
-            - likely-evergreen
-        age_days:
-          type: integer
-        repost_count:
-          type: integer
-          description: How many times this role has been reposted.
-        mass_posting_count:
-          type: integer
-          description: How many near-identical postings the same role cluster holds.
-        fake_freshness:
-          type: boolean
-          description: True when the stated posting date looks refreshed rather than real.
-    JobListEnvelope:
-      type: object
-      required:
-        - data
-      properties:
-        data:
-          type: array
-          items:
-            $ref: "#/components/schemas/Job"
-        meta:
-          $ref: "#/components/schemas/PaginationMeta"
-    SuggestionsEnvelope:
-      type: object
-      required:
-        - data
-      properties:
-        data:
-          type: array
-          items:
-            $ref: "#/components/schemas/Suggestion"
-        meta:
-          type: object
-          additionalProperties: true
-    Suggestion:
-      type: object
-      required:
-        - text
-        - parts
-        - jobs
-      properties:
-        text:
-          type: string
-          description: |
-            The whole phrase this row names — the recognised prefix plus the
-            completion, e.g. "Senior Software Engineer Google".
-        parts:
-          type: array
-          description: |
-            Every part the row applies. Apply ALL of them: a row naming a role and
-            a company that is applied as only one of the two silently discards
-            what the caller typed.
-          items:
-            type: object
-            required:
-              - kind
-              - text
-            properties:
-              kind:
+                data: {"kind":"single","title":"Senior Go Engineer","company_name":"Acme","job_slug":"senior-go-engineer-acme-1a2b","produced_at":"2026-11-05T12:00:00Z"}
+
+
+                '
+      security: []
+      tags:
+      - Suggestions and live feed
+  /stats/catalog:
+    get:
+      operationId: get_stats_catalog
+      summary: The headline catalogue-scale figures (open jobs, companies, sources, …).
+      description: 'The canonical numbers behind every "how big is this" figure on the site (the jobs
+        list total, the /about and /open pages). Backed by one snapshot `cmd/rollup-stats` republishes
+        periodically, not a live count. `exact: false` means the cache was cold and the figures fell back
+        to a planner estimate — treat them as approximate when it is false.'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
                 type: string
-                enum: [title, role, skill, category, company]
-                description: |
-                  Which vocabulary the part comes from, and so which parameter it
-                  applies to: `role` → `role`, `skill` → `skills`, `category` →
-                  `category`, `company` → `company_slug`. A `title` names no facet
-                  and is applied as `q`.
-              slug:
+              example: "{\n              \"data\": {\n                \"open_jobs\": 42130,\n        \
+                \        \"companies\": 6210,\n                \"sources\": 48,\n                \"ats_platforms\"\
+                : 22,\n                \"telegram_channels\": 340,\n                \"computed_at\": \"\
+                2026-06-18T06:00:00Z\",\n                \"exact\": true\n              }\n          \
+                \  }"
+      security: []
+      tags:
+      - Catalogue
+  /jobs/sitemap:
+    get:
+      operationId: get_jobs_sitemap
+      summary: Return one page of job sitemap entries.
+      description: Page size and offset are bounded; defaults to 10,000 entries.
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        description: Page size.
+        schema:
+          type: integer
+        example: '10000'
+      - name: offset
+        in: query
+        required: false
+        description: Rows to skip.
+        schema:
+          type: integer
+        example: '0'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
                 type: string
-                description: The facet value to apply. Absent for a `title`.
-              text:
+              example: '{ "data": [{ "slug": "senior-go-engineer-acme-1a2b", "updated_at": "2026-11-05T12:00:00Z"
+                }] }'
+      security: []
+      tags:
+      - Sitemaps
+  /jobs/sitemap/fresh:
+    get:
+      operationId: get_jobs_sitemap_fresh
+      summary: Return a newest-first page of job sitemap entries.
+      description: The newest-job window is bounded; requests beyond it return an empty page.
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        description: Page size.
+        schema:
+          type: integer
+        example: '10000'
+      - name: offset
+        in: query
+        required: false
+        description: Rows to skip.
+        schema:
+          type: integer
+        example: '0'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
                 type: string
-                description: How this part reads on its own.
-        jobs:
+              example: '{ "data": [{ "slug": "senior-go-engineer-acme-1a2b", "updated_at": "2026-11-05T12:00:00Z"
+                }] }'
+      security: []
+      tags:
+      - Sitemaps
+  /jobs/sitemap/boundaries:
+    get:
+      operationId: get_jobs_sitemap_boundaries
+      summary: List offsets for job sitemap chunks.
+      description: The chunk size is clamped to the supported range.
+      parameters:
+      - name: chunk
+        in: query
+        required: false
+        description: Sitemap chunk size.
+        schema:
           type: integer
-          description: |
-            Open postings behind the completion. Never zero — a suggestion that
-            leads to an empty page is withheld.
-    FacetsEnvelope:
-      type: object
-      required:
-        - data
-      properties:
-        data:
-          type: object
-          required:
-            - total
-            - facets
-          additionalProperties: true
-          properties:
-            total:
-              type: integer
-            facets:
-              type: object
-              description: Facet name to a map of value to matching-posting count.
-              additionalProperties:
-                type: object
-                additionalProperties:
-                  type: integer
-            stats:
-              type: object
-              description: |
-                Numeric ranges (min/max) for the continuous facets —
-                `salary_min`, `salary_max`, `experience_years_min`.
-              additionalProperties:
-                type: object
-                additionalProperties:
-                  type: number
-            companies_total:
-              type: integer
-              description: |
-                Present only when `facets=` names `company_slug`: the exact number
-                of distinct companies among the matching postings.
-            top_companies:
-              type: array
-              maxItems: 50
-              description: |
-                Present only when `facets=` names `company_slug`: the companies
-                with the most matching postings, in descending count. Replaces a
-                `company_slug` entry in `facets`.
-              items:
-                type: object
-                required:
-                  - slug
-                  - name
-                  - count
-                properties:
-                  slug:
-                    type: string
-                  name:
-                    type: string
-                    description: Display name; the slug when the company has none yet.
-                  count:
-                    type: integer
-        meta:
-          type: object
-          additionalProperties: true
-          description: |
-            Present ONLY when the request carried a parameter no filter read,
-            or a closed-facet value outside its vocabulary. A clean request
-            answers `{"data": ...}` with no meta block at all.
-          properties:
-            ignored_params:
-              type: array
-              items:
-                $ref: "#/components/schemas/IgnoredParam"
-            ignored_values:
-              $ref: "#/components/schemas/IgnoredValues"
-    CompanySummary:
-      type: object
-      additionalProperties: true
-      required:
-        - slug
-        - name
-      properties:
-        slug:
-          type: string
-        name:
-          type: string
-        job_count:
+        example: '10000'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: string
+              example: '{ "data": [0, 10000] }'
+      security: []
+      tags:
+      - Sitemaps
+  /companies/sitemap:
+    get:
+      operationId: get_companies_sitemap
+      summary: Return one page of company sitemap entries.
+      description: Page size and offset are bounded; defaults to 10,000 entries.
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        description: Page size.
+        schema:
           type: integer
-          description: Open roles currently indexed for this company.
-        tagline:
-          type: string
-          nullable: true
-        industries:
-          type: array
-          items:
-            type: string
-        hq_country:
-          type: string
-          nullable: true
-          description: ISO 3166-1 alpha-2, lowercase.
-        collections:
-          type: array
-          items:
-            type: string
-        feedback_count:
+        example: '10000'
+      - name: offset
+        in: query
+        required: false
+        description: Rows to skip.
+        schema:
           type: integer
-        feedback_rating_avg:
-          type: number
-          nullable: true
-    CompanyRef:
-      type: object
-      description: |
-        A related company: the parent that owns this one, or a subsidiary it owns. It is a
-        separate company with its own page and jobs, not another name for this one.
-      required:
-        - slug
-        - name
-        - job_count
-      properties:
-        slug:
-          type: string
-        name:
-          type: string
-        job_count:
+        example: '0'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: string
+              example: '{ "data": [{ "slug": "senior-go-engineer-acme-1a2b", "updated_at": "2026-11-05T12:00:00Z"
+                }] }'
+      security: []
+      tags:
+      - Sitemaps
+  /companies/sitemap/boundaries:
+    get:
+      operationId: get_companies_sitemap_boundaries
+      summary: List offsets for company sitemap chunks.
+      description: The chunk size is clamped to the supported range.
+      parameters:
+      - name: chunk
+        in: query
+        required: false
+        description: Sitemap chunk size.
+        schema:
           type: integer
-          description: Open jobs the related company has.
-    CompanyDetail:
-      type: object
-      additionalProperties: true
-      required:
-        - slug
-        - name
-      description: The company summary plus the profile fields served only on the detail endpoint.
-      properties:
-        slug:
-          type: string
-        name:
-          type: string
-        job_count:
-          type: integer
-        tagline:
-          type: string
-          nullable: true
-        company_info:
-          type: object
-          nullable: true
-          additionalProperties: true
-          description: Homepage, description, and other profile fields where known.
-        industries:
-          type: array
-          items:
-            type: string
-        domains:
-          type: array
-          items:
-            type: string
-        collections:
-          type: array
-          items:
-            type: string
-        regions:
-          type: array
-          items:
-            type: string
-        countries:
-          type: array
-          items:
-            type: string
-        remote_regions:
-          type: array
-          items:
-            type: string
-          description: Regions the company hires remotely in, derived from its open postings.
-        company_types:
-          type: array
-          items:
-            type: string
-        company_sizes:
-          type: array
-          items:
-            type: string
-        hq_country:
-          type: string
-          nullable: true
-        year_founded:
-          type: integer
-          nullable: true
-        employee_count:
-          type: integer
-          nullable: true
-        organization_type:
-          type: string
-          nullable: true
-        maturity:
-          type: string
-          nullable: true
-        yc_batch:
-          type: array
-          items:
-            type: string
-        yc_status:
-          type: array
-          items:
-            type: string
-        yc_stage:
-          type: array
-          items:
-            type: string
-        yc_flags:
-          type: array
-          items:
-            type: string
-        feedback_count:
-          type: integer
-        feedback_rating_avg:
-          type: number
-          nullable: true
-        upvote_count:
-          type: integer
-        downvote_count:
-          type: integer
-        my_vote:
-          type: integer
-          nullable: true
-          description: The calling user's vote. Always null on this unauthenticated schema.
-    CityMatch:
-      type: object
-      required:
-        - value
-        - country
-      properties:
-        value:
-          type: string
-          description: Canonical city name — pass this verbatim to the `cities` facet.
-        country:
-          type: string
-          description: ISO 3166-1 alpha-2, lowercase.
-    PaginationMeta:
-      type: object
-      additionalProperties: true
-      properties:
-        total:
-          type: integer
-          description: |
-            Postings matching the filter. Exact on the job endpoints; on an
-            unfiltered `searchCompanies` request it is a planner estimate.
-        limit:
-          type: integer
-          description: The page size actually applied, after clamping.
-        offset:
-          type: integer
-        ignored_params:
-          type: array
-          description: |
-            Present ONLY when the request carried a parameter no filter read —
-            a clean request omits the key entirely rather than sending `[]`.
-            **Check it.** A misspelled filter does not fail; it is dropped, and
-            the unfiltered result that comes back is indistinguishable from a
-            genuine one.
-          items:
-            $ref: "#/components/schemas/IgnoredParam"
-        ignored_values:
-          $ref: "#/components/schemas/IgnoredValues"
-    IgnoredValues:
-      type: object
-      description: |
-        Present ONLY when a closed-vocabulary facet (or its `_exclude` form)
-        carried a value outside its vocabulary — keyed by the parameter as sent,
-        each listing the unknown values. The value is still applied, so the
-        filter matches nothing on that axis; this says why the answer is empty.
-        `apply_questions_max` is reported here too when its value is not a
-        non-negative integer — that bound is then NOT applied, so the answer is
-        wider than asked.
-      additionalProperties:
-        type: array
-        items:
-          type: string
-    IgnoredParam:
-      type: object
-      required:
-        - param
-      properties:
-        param:
-          type: string
-          description: The query parameter that was received and not used.
-        did_you_mean:
-          type: string
-          description: |
-            The vocabulary's name for it, when the only mistake was grammatical
-            number — most facets are plural, so `country` resolves to
-            `countries`. Absent when nothing is close enough; a guess would
-            mislead more than silence.
-    ErrorEnvelope:
-      type: object
-      required:
-        - error
-      properties:
-        error:
-          type: string
+        example: '10000'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: string
+              example: '{ "data": [0, 10000] }'
+      security: []
+      tags:
+      - Sitemaps

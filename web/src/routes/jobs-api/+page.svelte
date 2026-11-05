@@ -22,8 +22,8 @@
 </script>
 
 <Seo
-  title="Jobs API for commercial use — freehire"
-  description="Millions of open job postings read from employers’ own ATS, de-duplicated and structured, behind one API. Flat monthly price, no per-job metering, a plain licence to show them in your product."
+  title="Public jobs API — freehire"
+  description="Search FreeHire’s deduplicated job catalogue through a public API, with keyword search, structured filters and links to original postings."
   {canonical}
 />
 
@@ -33,5 +33,5 @@
 </svelte:head>
 
 <div class="mx-auto w-full max-w-6xl px-4 py-6">
-  <JobsApiLandingView stats={data.stats} plans={data.plans} />
+  <JobsApiLandingView stats={data.stats} />
 </div>

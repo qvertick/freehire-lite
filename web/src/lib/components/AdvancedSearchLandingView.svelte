@@ -1,7 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import { UserRound } from '@lucide/svelte';
-  import { Button, Chip, NumberedGrid, SectionLabel } from '#lib/ui/index.js';
+  import { Button, Chip, SectionLabel } from '#lib/ui/index.js';
   import { pillClass, pillTitle } from './facets/pill';
   import { ADVANCED_SEARCH_FAQ } from '#lib/advancedSearchFaq.js';
 
@@ -115,34 +114,10 @@
     },
   ];
 
-  const saveSteps = [
-    {
-      n: '01',
-      title: 'Save this search',
-      body: 'One click turns your current filters into a saved search, listed under My filters right in the panel. Save more than one and switch between them — no separate setup screen.',
-    },
-    {
-      n: '02',
-      title: 'Pick a channel',
-      body: 'Telegram, email, or push to your phone. Turn on as many as you want, per saved search.',
-    },
-    {
-      n: '03',
-      title: 'Get matches, not a feed',
-      body: "When a new job matches, freehire sends it the moment it's indexed. Nothing to refresh, nothing to remember to check.",
-    },
-  ];
-
-  const cliCommands = [
-    { cmd: 'facets', desc: "Every filter's live values and counts — the vocabulary to filter by." },
-    { cmd: 'search "golang" --remote --region eu', desc: 'List matching jobs from a terminal or a script.' },
-  ];
 </script>
 
 <div class="flex flex-col">
-  <!-- Hero. Left: the pitch, front-loading breadth, exclude and save — the three
-       things this page has to land even for someone who reads only the first
-       screen. Right: the real pill mechanics, shrunk down and clickable. -->
+  <!-- Hero. Left: the pitch and breadth of public filters. Right: live pill mechanics. -->
   <section class="dot-grid -mx-4 grid items-center gap-12 px-4 pb-16 pt-8 lg:grid-cols-[1.05fr_0.95fr]">
     <div>
       <SectionLabel text="advanced search" />
@@ -153,13 +128,10 @@
         Role, seniority, stack, region, company type, salary currency, even whether a posting looks
         real — twenty filters, and almost every one can also mean <span class="text-foreground"
           >"not this."</span
-        > Build the search once, save it to your profile, and let freehire keep running it for you.
+        > Combine filters in a shareable URL and refine the public job catalogue.
       </p>
       <div class="mt-9 flex flex-wrap items-center gap-3">
         <Button href={resolve('/jobs')} variant="primary" size="lg">Browse jobs</Button>
-        <Button href={resolve('/my/notifications/searches')} variant="outline" size="lg">
-          Saved searches &amp; alerts
-        </Button>
       </div>
     </div>
 
@@ -268,96 +240,6 @@
     </div>
   </section>
 
-  <!-- Apply my profile: the reverse direction — profile feeds filters, not the
-       other way around — and a real, concrete exclude example (avoided skills). -->
-  <section class="border-t border-border py-14 sm:py-16">
-    <SectionLabel text="start from your profile" />
-    <div class="mt-6 grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-      <div>
-        <h2 class="max-w-md text-3xl font-semibold tracking-tight sm:text-4xl">
-          Or skip the setup — apply my profile.
-        </h2>
-        <p class="mt-5 max-w-xl text-sm leading-relaxed text-muted-foreground">
-          Everything you filled in becomes a starting set of filters, one click, right in the
-          panel: your specialization and skills go in as includes, the skills you're avoiding go
-          in as excludes, and your work-location preferences — remote regions, on-site countries
-          and cities, whether you'd relocate — come along too. Nothing to re-type.
-        </p>
-      </div>
-      <div class="rounded-xl border border-border bg-card p-6 sm:p-8">
-        <div class="flex items-center gap-2 text-sm font-medium">
-          <span class="flex size-8 items-center justify-center rounded-full bg-secondary">
-            <UserRound class="size-4" aria-hidden="true" />
-          </span>
-          Apply my profile
-        </div>
-        <dl class="mt-5 space-y-3 text-sm">
-          <div class="flex items-baseline justify-between gap-4">
-            <dt class="text-muted-foreground">Specialization &amp; skills</dt>
-            <dd class="font-mono text-xs text-muted-foreground">→ include</dd>
-          </div>
-          <div class="flex items-baseline justify-between gap-4">
-            <dt class="text-muted-foreground">Skills you're avoiding</dt>
-            <dd class="font-mono text-xs text-muted-foreground">→ exclude</dd>
-          </div>
-          <div class="flex items-baseline justify-between gap-4">
-            <dt class="text-muted-foreground">Where you'll work</dt>
-            <dd class="font-mono text-xs text-muted-foreground">→ region, country, city</dd>
-          </div>
-        </dl>
-        <Button href={resolve('/my/profile')} variant="outline" size="sm" class="mt-6">
-          Fill in your profile
-        </Button>
-      </div>
-    </div>
-  </section>
-
-  <!-- Save to profile, as the genuine 3-step sequence it is. -->
-  <section class="border-t border-border py-14 sm:py-16">
-    <SectionLabel text="save it once" />
-    <h2 class="mt-6 max-w-md text-3xl font-semibold tracking-tight sm:text-4xl">
-      Set the filters up once. They'll keep working after you close the tab.
-    </h2>
-    <NumberedGrid items={saveSteps} class="mt-10 sm:grid-cols-3" />
-    <div class="mt-8 flex flex-wrap gap-3">
-      <Button href={resolve('/jobs')} variant="primary" size="lg">Start filtering</Button>
-      <Button href={resolve('/my/notifications/searches')} variant="ghost" size="lg">
-        Saved searches &amp; alerts
-      </Button>
-    </div>
-  </section>
-
-  <!-- CLI — modest: names the shared vocabulary, links out to the full /cli page
-       rather than duplicating its command reference. -->
-  <section class="border-t border-border py-14 sm:py-16">
-    <SectionLabel text="from the terminal" />
-    <div class="mt-6 grid gap-10 lg:grid-cols-[1fr_1fr]">
-      <p class="max-w-xl text-sm leading-relaxed text-muted-foreground">
-        Every parameter name on this page — <code class="font-mono text-foreground">role</code>,
-        <code class="font-mono text-foreground">regions</code>,
-        <code class="font-mono text-foreground">skills</code>,
-        <code class="font-mono text-foreground">company_type</code> — is the same one the public API
-        and the freehire CLI use. Start from the live vocabulary, then filter from a script instead
-        of a browser tab.
-      </p>
-      <div class="rounded-lg border border-border bg-secondary/40 p-4">
-        <dl class="space-y-3">
-          {#each cliCommands as row (row.cmd)}
-            <div>
-              <dt class="font-mono text-sm">
-                <span class="text-muted-foreground">freehire</span> {row.cmd}
-              </dt>
-              <dd class="text-sm leading-relaxed text-muted-foreground">{row.desc}</dd>
-            </div>
-          {/each}
-        </dl>
-        <Button href={resolve('/cli')} variant="outline" size="sm" class="mt-4">
-          Read the CLI docs →
-        </Button>
-      </div>
-    </div>
-  </section>
-
   <!-- FAQ. The visible answers and the FAQPage JSON-LD share ADVANCED_SEARCH_FAQ. -->
   <section class="border-t border-border py-16 sm:py-20">
     <SectionLabel text="faq" />
@@ -379,13 +261,10 @@
     <div class="flex flex-col items-start gap-4 rounded-xl border border-border bg-secondary/40 p-6 sm:p-8">
       <h2 class="text-2xl font-semibold tracking-tight">Stop scrolling past the same noise.</h2>
       <p class="max-w-xl leading-relaxed text-muted-foreground">
-        Filter down to what you'd actually apply to, save it, and let freehire watch for the rest.
+        Use the public filters to narrow the catalogue to the roles, locations and terms that matter to you.
       </p>
       <div class="flex flex-wrap gap-3">
         <Button href={resolve('/jobs')} variant="primary" size="lg">Browse jobs</Button>
-        <Button href={resolve('/my/notifications/searches')} variant="outline" size="lg">
-          Saved searches &amp; alerts
-        </Button>
       </div>
     </div>
   </section>

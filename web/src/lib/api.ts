@@ -94,8 +94,6 @@ import type {
   DirectApplication,
   EmployerVacancyPatch,
   Contribution,
-  FoundJob,
-  ResolvedLink,
   ReferralOffer,
   ReferralRequestInput,
   ReferralCvOptions,
@@ -116,7 +114,6 @@ import type {
   BillingOverview,
   CheckoutSession,
   InviteSummary,
-  PlansMatrix,
   PlanState,
   UsageHistoryEntry,
   MyAnalysisItem,
@@ -1806,14 +1803,6 @@ export function createApi(
     return requestData<BillingOverview>('/api/v1/billing/subscription');
   }
 
-  /** What each plan allows and what Pro costs. Public: no session needed. Powers /pricing.
-   *
-   *  The allowances come from the same configuration the metering path reads, so the
-   *  comparison cannot drift from the limits actually enforced. */
-  async function plans(): Promise<PlansMatrix> {
-    return requestData<PlansMatrix>('/api/v1/plans');
-  }
-
   /** Where this caller manages their subscription — the payment provider's own page, where
    *  they change their card or cancel. Generated per visit and short-lived, so it is fetched
    *  when a surface is about to show it rather than stored.
@@ -2438,21 +2427,6 @@ export function createApi(
    *  not an error. */
   async function prefillSubmission(url: string): Promise<PrefillResult> {
     return requestData<PrefillResult>('/api/v1/submissions/prefill', jsonBody('POST', { url }));
-  }
-
-  /** Ask whether a job page in the wild is one the catalog already carries. Public and
-   *  read-only — it writes nothing, records no contribution, and fetches no page, so it is
-   *  the half of the link intake a signed-out visitor may run. `null` means the URL names
-   *  no posting we hold, which is an answer rather than an error. */
-  async function findJobByUrl(url: string): Promise<FoundJob | null> {
-    return requestData<FoundJob | null>(`/api/v1/jobs/find?url=${encodeURIComponent(url)}`);
-  }
-
-  /** Hand a job link to freehire. One sequence serves every surface: the catalog is checked,
-   *  the vacancy imported when anything can read it, and the board behind it recorded for
-   *  onboarding either way. The outcome says which of those happened (422 for a non-URL). */
-  async function resolveJobLink(url: string): Promise<ResolvedLink> {
-    return requestData<ResolvedLink>('/api/v1/jobs/resolve', jsonBody('POST', { url, surface: 'web' }));
   }
 
   /** The caller's own link contributions, newest first. */
@@ -3550,7 +3524,6 @@ export function createApi(
     myInterviews,
     myAnalyses,
     myPlan,
-    plans,
     billingCheckout,
     promoPreview,
     promoRedeem,
@@ -3626,8 +3599,6 @@ export function createApi(
     submitJob,
     listMySubmissions,
     prefillSubmission,
-    findJobByUrl,
-    resolveJobLink,
     listMyContributions,
     createReferralRequest,
     getReferralCvOptions,

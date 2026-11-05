@@ -87,12 +87,6 @@ export const FILTER_EXTRAS: FilterRow[] = [
     values: 'true — the description says so; false — every posting not marked, including recruiter posts that never say so',
   },
   {
-    param: 'former_employers',
-    label: 'Hiring again: companies you have worked at and left',
-    values:
-      'true — signed in only, read from your experience bank; a name that does not resolve to exactly one company is left out. Anonymous, it is reported in meta.ignored_params. `/jobs/facets` never applies this filter, so its counts ignore it even for signed-in callers',
-  },
-  {
     param: 'salary_min',
     label: 'Minimum salary',
     values: 'integer — jobs whose minimum salary is at least this (pair with salary_currency)',
@@ -142,11 +136,6 @@ export const FILTER_EXTRAS: FilterRow[] = [
     label: 'Open within',
     values:
       'integer — jobs first recorded by freehire in the last N days, i.e. how long the posting has been in the catalogue regardless of the date its source states. Independent of posted_within_days; both may be set and they narrow together',
-  },  {
-    param: 'apply_questions_max',
-    label: 'Application questions',
-    values:
-      'integer ≥ 0 — jobs whose application form requires at most N questions beyond name, contact details and CV (3 = the "short form" filter). Jobs with no form freehire could read are excluded: unknown is not short',
   },
 ];
 
@@ -158,7 +147,7 @@ export const FILTER_MODIFIERS = [
   'Different facets are ANDed together; numeric and boolean filters are ANDed too. The geography facets are the one exception — see below.',
   'Geography is a single OR group: `regions`, `countries`, `metros` and `cities` widen each other instead of narrowing. `regions=eu&countries=IT` means "in Europe **or** in Italy", so it returns everything `regions=eu` alone would. To search one country, drop the region: `countries=IT`. The four name a single concept — *where* — so picking two places reads as "either", which is what makes `regions=eu&countries=BR` ("Europe or Brazil") useful. There is no AND to switch on: `_mode=and` does not apply to geography.',
   'Use `regions=none` to match jobs with no resolved geography (an empty region set); it ORs with real region values and supports `_exclude` like any region.',
-  'A param no filter reads is ignored rather than refused — so old links and saved searches keep working — and comes back in `meta.ignored_params`, with `did_you_mean` when it is only the singular of a real facet. Check it: a dropped filter otherwise looks like a genuinely broad result. At most 10 are listed per response. The same report rides on `/jobs/facets`, `/market/coverage` and `/companies`, which answer `{"data": ...}` and grow a `meta` block only when there is something to warn about. `/companies` filters on its own vocabulary, so a jobs facet sent there is reported as ignored.',
+  'A param no filter reads is ignored rather than refused, so existing links keep working, and comes back in `meta.ignored_params`, with `did_you_mean` when it is only the singular of a real facet. Check it: a dropped filter otherwise looks like a genuinely broad result. At most 10 are listed per response. The same report rides on `/jobs/facets` and `/companies`, which grow a `meta` block only when there is something to warn about. `/companies` filters on its own vocabulary, so a jobs facet sent there is reported as ignored.',
 ];
 
 /** Worked filter recipes shown as ready-to-run examples. */

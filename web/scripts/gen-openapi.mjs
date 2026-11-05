@@ -1,82 +1,29 @@
-// Generates the two OpenAPI 3.1 documents the Scalar-based /docs/api and
-// /docs/api/internal references render, from the same single typed source as
+// Generates the OpenAPI 3.1 document the Scalar-based /docs/api reference renders,
+// from the same single typed source as
 // gen-api-docs.mjs (web/src/lib/docs/api-spec.ts + filters.ts), so the two
-// representations of the API cannot drift. partitionForAudience (in
-// gen-api-docs.mjs) splits the one spec into the two documents by each
-// endpoint's `auth` level.
+// representations of the public job-search API cannot drift.
 //
-// This is UNRELATED to web/static/openapi.yaml, which is a hand-maintained,
-// deliberately narrow OpenAPI 3.0.3 document for the ChatGPT Actions importer
-// (pinned to that shape by the importer's own limits — see
-// openspec/changes/migrate-api-docs-scalar/design.md). This generator's output
-// is a separate pair of files with the whole public/session API surface,
-// consumed only by the Scalar references.
+// web/static/openapi.yaml is the standalone public OpenAPI contract; this
+// generated document is consumed by the Scalar reference.
 //
 //   node scripts/gen-openapi.mjs    # writes ../src/lib/docs/generated/api-reference.openapi.json
-//                                   # and ../src/lib/docs/generated/api-reference.internal.openapi.json
 //
-// Both live under src/, not static/: each generated document is served to the
-// browser through its own src/routes/api-reference*.openapi.json/+server.ts
-// rather than as a raw static file, so the route can set its own
-// Cache-Control — see those files for why.
+// The generated document is served through
+// src/routes/api-reference.openapi.json/+server.ts, which sets its own
+// Cache-Control headers.
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { loadDocsModules, partitionForAudience, INTERNAL_TITLE } from './gen-api-docs.mjs';
+import { loadDocsModules } from './gen-api-docs.mjs';
 import { renderFilterSectionLines } from './renderFilterSection.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, '..');
 const outFile = resolve(webRoot, 'src', 'lib', 'docs', 'generated', 'api-reference.openapi.json');
-const outFileInternal = resolve(webRoot, 'src', 'lib', 'docs', 'generated', 'api-reference.internal.openapi.json');
-
-const SESSION_COOKIE_NAME = 'hire_token';
-
-const SECURITY_SCHEMES = {
-  cookieAuth: {
-    type: 'apiKey',
-    in: 'cookie',
-    name: SESSION_COOKIE_NAME,
-    description: 'Browser session cookie set on sign-in (HttpOnly, same-origin).',
-  },
-  apiKeyAuth: {
-    type: 'http',
-    scheme: 'bearer',
-    description: 'Personal API key sent as `Authorization: Bearer <token>`.',
-  },
-  moderatorAuth: {
-    type: 'apiKey',
-    in: 'cookie',
-    name: SESSION_COOKIE_NAME,
-    description: 'Browser session cookie from an account with the moderator role.',
-  },
-  extensionAuth: {
-    type: 'apiKey',
-    in: 'cookie',
-    name: SESSION_COOKIE_NAME,
-    description: 'Browser session cookie, reachable only through the browser extension consent flow.',
-  },
-};
-
-// auth -> OpenAPI `security` value. 'none' is an explicit empty requirement
-// (not an omitted field), so a reader never has to guess whether "no security
-// listed" meant public or merely undocumented.
 function securityFor(auth) {
-  switch (auth) {
-    case 'none':
-      return [];
-    case 'cookie-or-key':
-      return [{ cookieAuth: [] }, { apiKeyAuth: [] }];
-    case 'cookie':
-      return [{ cookieAuth: [] }];
-    case 'moderator':
-      return [{ moderatorAuth: [] }];
-    case 'extension':
-      return [{ extensionAuth: [] }];
-    default:
-      throw new Error(`Unknown auth level "${auth}" — add it to securityFor() in gen-openapi.mjs`);
-  }
+  if (auth === 'none') return [];
+  throw new Error(`Unknown auth level "${auth}" - the public API reference only supports unauthenticated endpoints`);
 }
 
 // Param.type is a closed, hand-written vocabulary (see api-spec.ts), not a JSON
@@ -290,7 +237,6 @@ export function renderOpenApi(spec, filters, { title = 'freehire API' } = {}) {
     servers: [{ url: BASE_URL }],
     tags,
     paths,
-    components: { securitySchemes: SECURITY_SCHEMES },
   };
 }
 
@@ -298,15 +244,10 @@ async function main() {
   const { spec, filters } = await loadDocsModules();
   await mkdir(dirname(outFile), { recursive: true });
 
-  const doc = renderOpenApi(partitionForAudience(spec, 'external'), filters);
+  const doc = renderOpenApi(spec, filters);
   const json = `${JSON.stringify(doc, null, 2)}\n`;
   await writeFile(outFile, json);
   console.log(`Wrote ${outFile} (${json.length} bytes)`);
-
-  const docInternal = renderOpenApi(partitionForAudience(spec, 'internal'), filters, { title: INTERNAL_TITLE });
-  const jsonInternal = `${JSON.stringify(docInternal, null, 2)}\n`;
-  await writeFile(outFileInternal, jsonInternal);
-  console.log(`Wrote ${outFileInternal} (${jsonInternal.length} bytes)`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

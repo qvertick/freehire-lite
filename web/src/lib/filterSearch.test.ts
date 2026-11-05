@@ -42,19 +42,11 @@ describe('matchFilterSearch', () => {
 });
 
 describe('jobFilterSearchItems', () => {
-  it('offers Hide viewed only to an eligible viewer, found by its aliases', () => {
-    const enabled = jobFilterSearchItems({ hideSeen: true });
-    expect(matchFilterSearch(enabled, 'viewed').some((h) => h.action === 'hide-seen')).toBe(true);
-    expect(jobFilterSearchItems().some((h) => h.action === 'hide-seen')).toBe(false);
-    expect(jobFilterSearchItems({ hideSeen: true, railKeys: ['salary'] }).some((h) => h.action === 'hide-seen')).toBe(false);
-  });
-
-  it('offers Hiring again only in an eligible Company pane, including former-employer aliases', () => {
-    const enabled = jobFilterSearchItems({ formerEmployers: true });
-    expect(matchFilterSearch(enabled, 'former employers').some((h) => h.action === 'former-employers')).toBe(true);
-    expect(jobFilterSearchItems().some((h) => h.action === 'former-employers')).toBe(false);
-    expect(jobFilterSearchItems({ formerEmployers: true, exclude: ['company_slug'] }).some((h) => h.action === 'former-employers')).toBe(false);
-    expect(jobFilterSearchItems({ formerEmployers: true, railKeys: ['salary'] }).some((h) => h.action === 'former-employers')).toBe(false);
+  it('does not expose account-dependent controls', () => {
+    const items = jobFilterSearchItems({ openWithin: true });
+    for (const action of ['hide-seen', 'former-employers', 'hide-ai', 'auto-apply', 'short-apply']) {
+      expect(items.some((hit) => hit.action === action)).toBe(false);
+    }
   });
 
   it('hides panes and params the modal is not showing', () => {

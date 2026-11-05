@@ -80,23 +80,6 @@ export interface Allowance {
 /** The caller's plan and every metered feature's standing today (`GET /api/v1/me/plan`).
  *  Every feature is listed, including untouched ones: the surface shows what the plan IS,
  *  and a feature missing because no row exists yet would read as one they do not have. */
-/** One thing a visitor may buy (`GET /api/v1/plans`). The money comes from the payment
- *  provider, never from our configuration: a price written beside its id in an env file is a
- *  second source of truth about what something costs, and the two disagree the first time
- *  one is changed — on the page a customer can hold us to. */
-export interface PublicPrice {
-  id: string;
-  /** Smallest currency unit, as the provider stores it. Formatting happens in the view. */
-  amount_cents: number;
-  currency: string;
-  interval: 'month' | 'year';
-  /** The price a new subscriber is sold unless they choose otherwise — one per tier. */
-  default: boolean;
-  /** Which plan this price buys. Derived on the server from the same lists that decide what
-   *  a subscription confers, so a column can never offer another plan's price. */
-  tier: 'pro' | 'ultra' | 'api' | 'api_data';
-}
-
 /** Where a buyer goes to pay, and which offer was applied on the way
  *  (`GET /api/v1/billing/checkout`).
  *
@@ -124,49 +107,8 @@ export interface InviteSummary {
   percent_off: number;
 }
 
-/** What one tier allows for one feature in a day. `unlimited` makes `limit` the fair-use
- *  guard behind it rather than a ceiling — the same two field names, in the same meaning,
- *  that every allowance response uses, so a page never has to learn a second vocabulary for
- *  one idea. */
-export interface PlanTierAllowance {
-  limit: number;
-  unlimited: boolean;
-}
-
-/** What each plan allows and what Pro costs (`GET /api/v1/plans`). Public and
- *  unauthenticated — a pricing page that needs an account cannot do a pricing page's job.
- *
- *  `features` comes from the same configuration the metering path reads, so the comparison
- *  cannot drift from the limits actually enforced. `enforced` names the features whose
- *  ceiling really refuses today; while the shadow run is on it is empty, and a page claiming
- *  otherwise would be selling a limit nobody meets. */
-
-export interface PlansMatrix {
-  features: { feature: string; free: PlanTierAllowance; pro: PlanTierAllowance; ultra: PlanTierAllowance }[];
-  prices: PublicPrice[];
-  enforced: string[];
-  /** What the API product's plans allow on the public read API, read from the same
-   *  constants the rate limiter enforces. `anonymous_per_day` is 0 while there is no daily
-   *  cap for callers without a key. */
-  api_limits: {
-    anonymous_per_minute: number;
-    anonymous_per_day: number;
-    api_per_minute: number;
-    data_per_minute: number;
-    /** The whole rate ladder, lowest first. Optional: a backend that predates it sends none. */
-    tiers?: RateTierLimit[];
-  };
-}
-
-/** A rung of the public read API's rate ladder. */
+/** A rate-limit tier reported by account-only billing endpoints. */
 export type RateTier = 'anonymous' | 'free' | 'pro' | 'ultra' | 'api' | 'api_data';
-
-/** One rung's budget; `per_day` 0 is no daily cap. */
-export interface RateTierLimit {
-  tier: RateTier;
-  per_minute: number;
-  per_day: number;
-}
 
 /** The caller's API standing (`GET /api/v1/me/api-plan`). An empty `tier` means the account
  *  does not hold the API product; `rate_tier` is the rung its full-scope keys and access

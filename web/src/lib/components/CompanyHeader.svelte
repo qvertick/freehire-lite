@@ -1,66 +1,16 @@
 <script lang="ts">
-  import AIInterviewBadge from './AIInterviewBadge.svelte';
-  import { Star } from '@lucide/svelte';
-  import { isAuthenticated } from '#lib/auth.svelte.js';
-  import { promptSignIn } from '#lib/signin.js';
-  import type { Company, CompanyFeedbackSummary } from '#lib/types.js';
-  import CompanyFeedbackDialog from './CompanyFeedbackDialog.svelte';
-  import CompanyFeedbackListDialog from './CompanyFeedbackListDialog.svelte';
+  import type { Company } from '#lib/types.js';
   import { companyLogoUrl } from '#lib/logo.js';
   import { EntityLogo } from '#lib/ui/index.js';
   import CredentialBadge from './CredentialBadge.svelte';
   import BackerBadge from './BackerBadge.svelte';
-  import CompanyFollowButton from './CompanyFollowButton.svelte';
-  import VoteControl from './VoteControl.svelte';
 
-  // The company's header card: identity (logo + name + tagline + follow CTA) with the
+  // The company's header card: identity (logo + name + tagline) with the
   // industries and the website/LinkedIn links below a divider. The scalar company facts
   // live in a separate CompanyFacts card (jobs sidebar on desktop, under the header on
   // mobile), so this stays compact. The card is always shown, even for an unenriched
   // company (just the identity row) — the tagline and the meta divider are present-only.
-  let { company, slug }: { company: Company; slug: string } = $props();
-
-  // The feedback list dialog (star ratings + category + text), opened from the
-  // rating badge below. Before any feedback exists there's nothing to list, so the
-  // same slot instead opens the write dialog directly — the header always carries
-  // one feedback entry point, not just once a rating exists to show. Once the list
-  // is open, its own "Write feedback" button is the way back into the write dialog.
-  //
-  // feedbackCount/feedbackRatingAvg are derived from the server-rendered `company`
-  // prop (so a company switch or refreshed data is picked up), overridden only after a save: the dialog's
-  // `onSaved` already carries the write's freshly recomputed counters (Upsert
-  // and Delete both return them), so the badge flips immediately with no
-  // follow-up fetch — and so no window where that fetch can itself fail and
-  // leave the badge stale, which is what the earlier getCompany-refetch version
-  // of this function could do.
-  let showFeedbackList = $state(false);
-  let showFeedbackForm = $state(false);
-  let feedbackOverride = $state<CompanyFeedbackSummary | null>(null);
-  // A save applies to one company only; drop a stale override on a client-side
-  // switch to another company (SvelteKit reuses this component across a
-  // `/companies/[slug]` param change) — otherwise the previous company's
-  // reviewed-just-now counters would keep showing on the new one.
-  $effect(() => {
-    void slug;
-    feedbackOverride = null;
-  });
-  const feedbackCount = $derived(feedbackOverride?.feedback_count ?? company.feedback_count);
-  const feedbackRatingAvg = $derived(feedbackOverride?.feedback_rating_avg ?? company.feedback_rating_avg);
-  function openFeedbackEntry() {
-    if (feedbackCount > 0) {
-      showFeedbackList = true;
-      return;
-    }
-    openFeedbackForm();
-  }
-  function openFeedbackForm() {
-    if (!isAuthenticated()) {
-      promptSignIn();
-      return;
-    }
-    showFeedbackList = false;
-    showFeedbackForm = true;
-  }
+  let { company }: { company: Company; slug?: string } = $props();
 
   const info = $derived(company.company_info ?? {});
   const industries = $derived(company.industries ?? []);
@@ -95,42 +45,7 @@
         </div>
       {/if}
     </div>
-    <!-- flex-1 above lets the name/tagline use the full width; the follow CTA stays
-         top-right and never shrinks (it collapses to an icon on mobile itself). -->
-    <div class="shrink-0">
-      <CompanyFollowButton {slug} companyName={company.name} />
-    </div>
   </div>
-  <!-- Feedback + votes get their own right-aligned row instead of sharing the identity
-       row: together they are ~220px of non-shrinking width, which on a phone would leave
-       the name/tagline column too narrow to hold a word. The discussion is a tab now
-       (CompanyTabs), not a link here. -->
-  <div class="mt-3 flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
-    <button
-      type="button"
-      class="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-      onclick={openFeedbackEntry}
-    >
-      {#if feedbackCount > 0}
-        <Star class="size-4" fill="currentColor" aria-hidden="true" />
-        {(feedbackRatingAvg ?? 0).toFixed(1)} · {feedbackCount}
-      {:else}
-        <Star class="size-4" aria-hidden="true" />
-        Leave feedback
-      {/if}
-    </button>
-    <VoteControl
-      target="company"
-      {slug}
-      upvoteCount={company.upvote_count ?? 0}
-      downvoteCount={company.downvote_count ?? 0}
-      myVote={company.my_vote ?? 0}
-    />
-  </div>
-  <!-- The employer-level fact, where it belongs: an AI interviewer is a property of
-       how this company hires, not of any one posting. Renders nothing until somebody
-       reports it. -->
-  <AIInterviewBadge count={company.ai_interview_reports} class="mt-2" />
   {#if hasMeta}
     <!-- Industries and links are two groups, not one flat wrap list: on a phone a flat
          list mixes a chip and a URL on the same line. Grouping keeps them on one row
@@ -170,19 +85,3 @@
     </div>
   {/if}
 </section>
-
-{#if showFeedbackList}
-  <CompanyFeedbackListDialog
-    {slug}
-    companyName={company.name}
-    onClose={() => (showFeedbackList = false)}
-    onWriteFeedback={openFeedbackForm}
-  />
-{/if}
-{#if showFeedbackForm}
-  <CompanyFeedbackDialog
-    {slug}
-    onClose={() => (showFeedbackForm = false)}
-    onSaved={(summary) => (feedbackOverride = summary)}
-  />
-{/if}

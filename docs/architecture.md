@@ -62,9 +62,9 @@ Deeper: [`internal/ingest/pipeline`](../internal/ingest/pipeline/AGENTS.md) · [
 
 **`web/`** is the SvelteKit SPA, served same-origin with the API in production and proxied to it in development. It does not hand-maintain its view of the backend's types: `cmd/gen-contracts` generates `web/src/lib/generated/contracts.ts` from the Go wire structs and the closed vocabularies (source names, application stages, enrichment facets), so a value added in Go and missing from the SPA's maps is a TypeScript error rather than a blank cell that ships green.
 
-**`design-system/`** is a sibling pnpm package linked into `web/` and `extension/` by symlink rather than copy — install it before building either consumer, because neither package manager installs a linked package's own dependencies for you.
+**`design-system/`** is a sibling pnpm package linked into `web/` by symlink rather than copy — install it before building the web app, because pnpm does not install a linked package's own dependencies for you.
 
-Deeper: [`AGENTS.md`](../AGENTS.md) for the full module index · [`web/AGENTS.md`](../web/AGENTS.md) · [`design-system/AGENTS.md`](../design-system/AGENTS.md) · [`extension/AGENTS.md`](../extension/AGENTS.md) · [`CONTRIBUTING.md`](../CONTRIBUTING.md)
+Deeper: [`AGENTS.md`](../AGENTS.md) for the full module index · [`web/AGENTS.md`](../web/AGENTS.md) · [`design-system/AGENTS.md`](../design-system/AGENTS.md) · [`CONTRIBUTING.md`](../CONTRIBUTING.md)
 
 ## The ecosystem
 
@@ -192,7 +192,6 @@ This document is a map; the files below are the territory. [`AGENTS.md`](../AGEN
 | Digests, reminders, nudges | [`docs/agents/notifications.md`](agents/notifications.md) |
 | Closing, pruning, liveness | [`docs/agents/job-lifecycle.md`](agents/job-lifecycle.md) |
 | The SPA | [`web/AGENTS.md`](../web/AGENTS.md), [`design-system/AGENTS.md`](../design-system/AGENTS.md) |
-| The browser extension | [`extension/AGENTS.md`](../extension/AGENTS.md) |
 | What a feature does, rather than how | [`docs/features.md`](features.md) |
 | Endpoints and parameters | [freehire.me/docs/api](https://freehire.me/docs/api) |
 

@@ -90,7 +90,7 @@
      raw text with no card wrapper, so 16px reads tight against the edge; sm+ falls
      back to the shared px-4 rhythm. -->
 <div class="mx-auto w-full max-w-6xl px-5 py-6 sm:px-4">
-  <JobView job={data.job} applyForm={data.applyForm} hasSimilar={data.similar.length > 0} />
+  <JobView job={data.job} />
 
   <!-- `#similar-jobs` is where a closed posting's notice points its reader. JobRelated opens
        on the Similar tab whenever there are similar postings, which is the only case in

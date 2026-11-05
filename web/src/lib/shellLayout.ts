@@ -20,7 +20,7 @@ export function isFullBleedRoute(pathname: string): boolean {
 
 // Routes whose header should span the full width instead of centering inside
 // `max-w-6xl`, without the rest of isFullBleedRoute's consequences (no footer, no
-// viewport-height sizing). `/docs/api` and `/docs/api/internal` are the two cases today:
+// viewport-height sizing). `/docs/api` is the route that needs the wider header:
 // both render the same Scalar three-column layout of sidebar, content and
 // request/response examples that reads the same way every full-bleed surface does — a
 // centered header floating narrower than the columns beneath it — but each stays a
@@ -31,7 +31,7 @@ export function isFullBleedRoute(pathname: string): boolean {
  *  both isWideHeaderRoute and TopBar's search-box suppression need to recognize
  *  as a group, kept here as the single place that lists them. */
 export function isApiReferenceRoute(pathname: string): boolean {
-  return pathname === '/docs/api' || pathname === '/docs/api/internal';
+  return pathname === '/docs/api';
 }
 
 /** True wherever the header should go edge to edge — every isFullBleedRoute plus the

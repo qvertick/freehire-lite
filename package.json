@@ -1,7 +1,7 @@
 {
   "name": "freehire",
   "private": true,
-  "description": "Repository root. The Go module is the product; web/, design-system/ and extension/ are their own packages with their own manifests. Only repo-wide tooling lives here.",
+  "description": "Repository root. The Go module is the product; web/ and design-system/ are their own packages with their own manifests. Only repo-wide tooling lives here.",
   "type": "module",
   "packageManager": "pnpm@11.7.0",
   "scripts": {

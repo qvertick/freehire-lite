@@ -107,61 +107,20 @@ export const STATIC_PATHS = [
   '/about',
   '/companies',
   '/collections',
-  // The public Talent Network catalogue. Indexable and linked from the header menu
-  // and the footer, but it was in neither the sitemap nor anything a crawler reads,
-  // so nothing told a search engine it exists. The per-candidate cards under it are
-  // NOT here: a card is anonymous by design and 404s until its owner's CV has been
-  // read, so offering crawlers a path to one is offering a path to a page we cannot
-  // promise resolves.
-  '/talent',
-  '/for-companies',
-  '/recruiters',
-  '/features/extension',
-  '/features/inbox',
-  '/features/referrals',
-  '/features/interview-buddies',
-  '/features/tailor',
-  '/features/tracking',
-  '/features/notifications',
   '/features/ghost-jobs',
   '/features/advanced-search',
   '/how-it-works',
-  // The discussions feed. The individual threads are NOT here: they live under their
-  // subject's route, and a sub-sitemap for the handful that exist would be
-  // infrastructure ahead of need.
-  '/discussions',
-  // The data and API surfaces. Indexable pages that carry the site's most citable
-  // material — live catalogue figures (/open), market rollups (/trends), the API
-  // reference — so they belong in the sitemap even though nothing links to some of
-  // them from the feed.
+  // The data and API surfaces, including live catalogue figures and the API reference.
   '/open',
-  // The market rollups. /analytics was reachable from the header menu and from
-  // nowhere a crawler reads, the same gap /talent had.
-  '/analytics',
   // Where the catalogue comes from: every source, what each carries, when it was last
   // read. Sits with /open rather than with /status because it is a citable statement
   // about the catalogue, not an operational dashboard.
   '/sources',
-  '/trends',
   '/docs/api',
-  // The commercial-use landing for the read API: meant to be found by "jobs API" searches.
-  '/jobs-api',
-  '/agents',
-  '/cli',
-  // How to add the hosted MCP connectors to Claude, ChatGPT and the coding agents.
-  '/mcp',
-  '/chatgpt',
-  // The public CV roast: an account-free landing page nothing in the feed links to,
-  // built to be found by search rather than clicked to from elsewhere on the site.
-  '/roast',
-  '/contribute',
   // The contributor showcase. The per-person profiles are NOT here — they come from
   // the committed snapshot via contributorPaths(), the same way collections do.
   '/contributors',
   '/status',
-  // Live semantic-embedding coverage of the catalogue, and the invitation to help with
-  // it — public, and meant to be found by someone who might lend a machine.
-  '/semantic-search',
   // Named as the App Store listing's Support URL, so it must resolve and stay
   // indexable — a 404 there is a rejection.
   '/support',

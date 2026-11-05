@@ -1,6 +1,7 @@
 import contextlib
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -31,11 +32,10 @@ class ClassificationTests(unittest.TestCase):
         self.assertEqual(classify(["internal/ai/plan/plan.go"]), Scope(True, True))
 
     def test_generated_api_docs_are_checked_by_web(self):
-        for path in ("docs/API.md", "docs/API.internal.md"):
-            self.assertEqual(classify([path]), Scope(False, True))
+        self.assertEqual(classify(["docs/API.md"]), Scope(False, True))
 
-    def test_prose_and_extension_changes_keep_unit_guards(self):
-        for path in ("README.md", "AGENTS.md", "docs/agents/example.md", "openspec/specs/example/spec.md", "extension/lib/tools/testdata/fill-simple-call.json"):
+    def test_prose_changes_keep_unit_guards(self):
+        for path in ("README.md", "AGENTS.md", "docs/agents/example.md", "openspec/specs/example/spec.md"):
             with self.subTest(path=path):
                 scope = classify([path])
                 self.assertEqual(scope, Scope(False, False))
@@ -101,10 +101,13 @@ class GitChangesTests(unittest.TestCase):
     def test_paths_with_spaces_and_newlines_are_not_split(self):
         self.write("README.md", "fixture\n")
         base = self.commit()
-        path = "web/file with a\nnewline.ts"
-        self.write(path, "fixture\n")
+        paths = ["web/file with spaces.ts"]
+        if os.name != "nt":
+            paths.append("web/file with a\nnewline.ts")
+        for path in paths:
+            self.write(path, "fixture\n")
         head = self.commit()
-        self.assertEqual(read_changes(base, head, self.repo), [path])
+        self.assertEqual(set(read_changes(base, head, self.repo)), set(paths))
 
     def test_initial_missing_and_invalid_bases_fall_back_to_full(self):
         self.write("README.md", "fixture\n")

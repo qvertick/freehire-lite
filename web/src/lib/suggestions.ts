@@ -27,32 +27,13 @@ export interface Suggestion {
 /** How many rows an empty box offers. Ten is what a visitor will actually read. */
 const maxStarters = 10;
 
-/** Rows each group contributes before the next group is reached.
- *
- *  One would be a flat map of the catalogue, and the catalogue is only half a tech
- *  catalogue: measured against production, one-per-group spent five of the ten rows on
- *  Management, Sales, HR, Operations and Healthcare. Two spends the budget on the
- *  groups the curated order puts first, which is who this is for. Those categories
- *  stay one keystroke away — this list is a starting point, not the vocabulary. */
-const perGroup = 2;
-
 /** The catch-all category. A real facet value and a useless suggestion: it names no
  *  craft, so it cannot answer the question an empty box is asking. */
 const catchAll = 'other';
 
-/** What to offer when the box is empty and the visitor does not know what they may
- *  type. Categories, in the curated group order the filter modal already renders —
- *  Engineering, Data & AI, Quality & Security, and so on, with the consumer
- *  industries last.
- *
- *  NOT the busiest values. Measured on the live catalogue those are Management
- *  (266,883), Sales (179,993) and Support (127,110): a tech job board that opens by
- *  offering those reads as somebody else's website.
- *
- *  And not a flat walk of that order either. Engineering alone carries 13 categories,
- *  so taking the first ten in sequence spends every row on it and never reaches a
- *  designer or a PM. Instead each group contributes its busiest category before any
- *  group contributes a second — Engineering still leads, but the list spans the map. */
+/** The most common measured categories across the whole catalogue. The flat ranking is
+ *  intentional: suggestions should describe the jobs people can actually find, not a
+ *  product's former IT-only focus. CATEGORY_GROUPS supplies the stable tie order. */
 export function starterSuggestions(
   counts: FacetCounts | null,
   limit: number = maxStarters,
@@ -60,31 +41,14 @@ export function starterSuggestions(
   const dist = counts?.facets?.category;
   if (!dist) return [];
 
-  // Each group's own options, busiest first. A category the distribution does not
-  // carry is dropped rather than offered with a zero: it would lead to an empty page.
-  //
-  // Absence is read off the value, not with `Object.hasOwn`: the distribution is
-  // decoded JSON, so a key that is present always holds a number and the two say the
-  // same thing — but `Object.hasOwn` is a runtime method no build target polyfills,
-  // and Safari only grew it in 15.4. It threw for the browsers below that, which
-  // takes the header search's whole derived chain down rather than one dropdown.
-  const groups = CATEGORY_GROUPS.map((section) =>
-    section.options
-      .filter((o) => o.value !== catchAll && dist[o.value] !== undefined)
-      .sort((a, b) => (dist[b.value] ?? 0) - (dist[a.value] ?? 0)),
-  ).filter((options) => options.length > 0);
-
-  const out: Suggestion[] = [];
-  for (const options of groups) {
-    for (const option of options.slice(0, perGroup)) {
-      out.push({
-        kind: 'category',
-        slug: option.value,
-        label: option.label,
-        count: dist[option.value],
-      });
-      if (out.length === limit) return out;
-    }
-  }
-  return out;
+  return CATEGORY_GROUPS.flatMap((section) => section.options)
+    .filter((option) => option.value !== catchAll && dist[option.value] !== undefined)
+    .sort((a, b) => (dist[b.value] ?? 0) - (dist[a.value] ?? 0))
+    .slice(0, limit)
+    .map((option) => ({
+      kind: 'category',
+      slug: option.value,
+      label: option.label,
+      count: dist[option.value],
+    }));
 }

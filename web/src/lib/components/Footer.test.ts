@@ -1,38 +1,36 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { APP_STORE_URL } from '#lib/appLinks.js';
 import { describe, expect, it } from 'vitest';
 
-// A SOURCE-TEXT AUDIT, not a mounted-component test — web/ has no component-test
-// infrastructure at all (see jobActionStrip.test.ts's own comment: no Svelte
-// plugin, no DOM in vitest.config.ts).
-//
-// The account shell (/my/*) needed a footer, but not the marketing one: the four
-// link columns, the popular-collections strip and the Product Hunt badge are noise
-// next to an app surface with its own sidebar nav. `compact` keeps everything below
-// the bottom bar (copyright, cookie settings, social links, open-source note) and
-// drops the rest, reusing the bottom bar's own markup rather than forking a second
-// component.
+// A source-text audit, not a mounted-component test: `compact` keeps the bottom bar
+// and drops the site navigation and collection links for account layouts.
 const SOURCE = readFileSync(join(import.meta.dirname, 'Footer.svelte'), 'utf8');
 
-// The offset of the `{/if}` that closes the `{#if !compact}` block: before it is the
-// marketing chrome the compact footer drops, after it the bottom bar every footer keeps.
-// Three of the tests below need that same boundary, and spelling the nested indexOf out
-// each time is how the second and third copies came to differ from the first.
-const GUARD_END = SOURCE.indexOf('{/if}', SOURCE.indexOf('productHunt.href'));
+const GUARD_START = SOURCE.indexOf('{#if !compact}');
+const GUARD_END = SOURCE.indexOf('{/if}', GUARD_START);
 
 describe('Footer compact mode', () => {
   it('declares a compact prop defaulting to false', () => {
     expect(SOURCE).toMatch(/let\s*\{\s*compact\s*=\s*false\s*\}/);
   });
 
-  it('skips the link groups, popular collections, and Product Hunt badge when compact', () => {
+  it('skips the link groups and popular collections when compact', () => {
     const groupsAt = SOURCE.indexOf('{#each groups as group');
-    const guardAt = SOURCE.lastIndexOf('{#if !compact}', groupsAt);
-    expect(guardAt, 'expected an {#if !compact} guard before the link groups').toBeGreaterThan(-1);
+    const popularAt = SOURCE.indexOf('aria-label="Popular collections"');
+    expect(GUARD_START, 'expected an {#if !compact} guard').toBeGreaterThan(-1);
+    expect(groupsAt).toBeGreaterThan(GUARD_START);
+    expect(popularAt).toBeGreaterThan(GUARD_START);
+    expect(GUARD_END).toBeGreaterThan(popularAt);
+  });
 
-    const producthuntAt = SOURCE.indexOf('productHunt.href');
-    expect(GUARD_END, 'expected the {#if !compact} guard to still be open at the Product Hunt badge').toBeGreaterThan(producthuntAt);
+  it('keeps only job-search and site-information destinations in the footer navigation', () => {
+    expect(SOURCE).toContain("resolve('/jobs')");
+    expect(SOURCE).toContain("resolve('/companies')");
+    expect(SOURCE).toContain("resolve('/collections')");
+    expect(SOURCE).toContain("resolve('/sources')");
+    expect(SOURCE).not.toContain("resolve('/talent')");
+    expect(SOURCE).not.toContain("resolve('/features/");
+    expect(SOURCE).not.toContain("resolve('/agents')");
   });
 
   it('still renders the bottom bar (copyright, cookie settings, social, open-source note) unconditionally', () => {
@@ -43,55 +41,10 @@ describe('Footer compact mode', () => {
     expect(bottomBar).toContain('View source on GitHub');
   });
 
-  it('skips the store buttons when compact — they sit in the same guarded block', () => {
-    const eachAt = SOURCE.indexOf('{#each stores as store');
-    // Asserted before the comparison, not folded into it: indexOf answers -1 when the
-    // block is gone, and -1 is less than any offset — so deleting the store buttons
-    // outright would have satisfied "they are inside the guard".
-    expect(eachAt, 'expected the store buttons to be rendered at all').toBeGreaterThan(-1);
-    expect(eachAt).toBeLessThan(GUARD_END);
-  });
-
   it("only borders the bottom bar's own top when compact (no divider from a section that isn't rendered)", () => {
     const commentAt = SOURCE.indexOf('Bottom bar:');
     const innerDivAt = SOURCE.indexOf('mx-auto flex max-w-6xl flex-col');
     const wrapperOpenTag = SOURCE.slice(commentAt, innerDivAt);
     expect(wrapperOpenTag).toContain('compact ?');
-  });
-});
-
-describe('Footer store buttons', () => {
-  it('links the App Store listing with NO country segment', () => {
-    // The listing's own share link is `/br/app/...`, which pins every visitor to the
-    // Brazilian storefront — a wrong-country page still loads, so nothing downstream
-    // could catch it. Without a country Apple redirects each visitor to their own.
-    expect(SOURCE).toContain('APP_STORE_URL');
-    expect(APP_STORE_URL).toBe('https://apps.apple.com/app/freehire-open-job-search/id6801885119');
-    expect(APP_STORE_URL).not.toMatch(/apps\.apple\.com\/[a-z]{2}\//);
-  });
-
-  it('takes both extension store URLs from #lib/extensionLinks rather than spelling them again', () => {
-    expect(SOURCE).toContain("import { EXTENSION_FIREFOX_URL, EXTENSION_STORE_URL } from '#lib/extensionLinks.js'");
-    expect(SOURCE).toContain('href: EXTENSION_STORE_URL');
-    expect(SOURCE).toContain('href: EXTENSION_FIREFOX_URL');
-    expect(SOURCE).not.toContain('chromewebstore.google.com');
-    expect(SOURCE).not.toContain('addons.mozilla.org');
-  });
-
-  it('links Dictionary immediately after Skills glossary', () => {
-    const skills = SOURCE.indexOf("label: 'Skills glossary'");
-    const dictionary = SOURCE.indexOf("label: 'Dictionary'");
-    const recruiters = SOURCE.indexOf("label: 'Recruiters'");
-    expect(skills).toBeGreaterThan(-1);
-    expect(dictionary).toBeGreaterThan(skills);
-    expect(recruiters).toBeGreaterThan(dictionary);
-    expect(SOURCE.slice(dictionary, recruiters)).toContain("resolve('/dictionary')");
-  });
-
-  it('opens both in a new tab with a safe rel', () => {
-    const eachAt = SOURCE.indexOf('{#each stores as store');
-    const block = SOURCE.slice(eachAt, SOURCE.indexOf('{/each}', eachAt));
-    expect(block).toContain('target="_blank"');
-    expect(block).toContain('rel="noopener noreferrer"');
   });
 });

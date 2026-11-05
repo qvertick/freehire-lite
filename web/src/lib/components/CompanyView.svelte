@@ -7,8 +7,6 @@
   import CompanyTabs from './CompanyTabs.svelte';
   import CompanyAbout from './CompanyAbout.svelte';
   import CompanyFacts from './CompanyFacts.svelte';
-  import ReferralBlock from './ReferralBlock.svelte';
-  import MentorBlock from './MentorBlock.svelte';
   import CompanyRelations from './CompanyRelations.svelte';
 
   // Both the company entity and its first page of jobs are server-rendered (route
@@ -23,7 +21,6 @@
     initial,
     slug,
     currentPage,
-    referralAvailable = false,
     parent,
     subsidiaries,
   }: {
@@ -33,7 +30,6 @@
     // Passed straight to JobsView, where page links are the only way through the
     // results — so it is required here too rather than defaulting to page one.
     currentPage: number;
-    referralAvailable?: boolean;
     // The company that owns this one and the ones it owns: separate employers, linked.
     parent: CompanyRef | null;
     subsidiaries: CompanyRef[];
@@ -41,21 +37,9 @@
 </script>
 
 <CompanyHeader {company} {slug} />
-<CompanyRelations name={company.name} {slug} {parent} {subsidiaries} />
+<CompanyRelations {parent} {subsidiaries} />
 
 <CompanyTabs {slug} active="jobs">
-  <!-- Two independent conditions, not one. A company can have a mentor and no referral
-       offer: they are different people volunteering different things, and nesting the
-       mentorship block inside the referral gate hid it from exactly the companies that
-       had only the newer of the two. MentorBlock renders nothing on its own when there
-       is no mentor, so it needs no gate here. -->
-  <div class="mt-4 flex flex-col gap-4">
-    {#if referralAvailable}
-      <ReferralBlock companySlug={slug} companyName={company.name} />
-    {/if}
-    <MentorBlock companySlug={slug} companyName={company.name} />
-  </div>
-
   <!-- Company facts + About sit atop the jobs sidebar on desktop (passed into JobsView
        as `sidebarTop`); the sidebar is hidden on mobile, so mirror them here as cards
        under the header. Both render nothing when the company has no facts/description. -->

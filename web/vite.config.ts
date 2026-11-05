@@ -103,14 +103,12 @@ export default defineConfig({
           // descriptions carry no images at all — the ingest sanitizer strips them
           // (internal/sources/sanitize.go). `data:` is here for the handful of Tailwind
           // utilities that inline an SVG.
-          // api.producthunt.com serves the Product Hunt "featured" badge embedded in
-          // the footer (Footer.svelte) — a single static SVG per theme.
           // avatars.githubusercontent.com is GitHub's avatar CDN, read by the contributor
           // showcase and profile pages. Adding a host here widens what the assistant's
           // markdown could point an <img> at if the sanitizer ever regressed, so it is
           // worth naming why this one is acceptable: it is a static image CDN on a path
           // shape we do not control and it accepts no query we could smuggle data through,
-          // which is the same argument the logo proxy and the badge host already sit on.
+          // which is the same argument the logo proxy already sits on.
           // Left off, every avatar on those pages silently falls back to initials — the
           // page still renders, so nothing fails loudly.
           // www.googletagmanager.com is the one exception to that argument: gtag.js
@@ -122,7 +120,6 @@ export default defineConfig({
             'self',
             'data:',
             'https://logo.freehire.me',
-            'https://api.producthunt.com',
             'https://avatars.githubusercontent.com',
             'https://www.googletagmanager.com',
           ],

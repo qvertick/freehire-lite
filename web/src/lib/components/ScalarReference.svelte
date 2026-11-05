@@ -1,5 +1,5 @@
 <script lang="ts">
-  // The Scalar mount + theme bridge shared by /docs/api and /docs/api/internal — the
+  // The Scalar mount + theme bridge for /docs/api —
   // only thing that differs between the two pages is which spec `config` points at.
   // `scalarHtml` is the SSR fragment from the page's own +page.server.ts (same config,
   // rendered via renderApiReferenceToString); this hydrates it client-side.

@@ -8,11 +8,11 @@ import { COUNTRY_REGION_MAP } from './generated/contracts';
 import { companyLogoUrl } from './logo';
 import type { Company, Enrichment, Job, JobCard } from './types';
 
-const SITE = 'freehire';
+const SITE = 'Job Searcher';
 // Site-level facts reused across the homepage WebSite/Organization schema.
 const SITE_DESCRIPTION =
-  'Freehire is an open-source search engine for tech jobs: it indexes millions of openings straight from company career boards, deduplicates them, and tags each with stack, seniority and location. Free and open source.';
-const SITE_GITHUB = 'https://github.com/strelov1/freehire';
+  'Job Searcher brings vacancies from supported job platforms into one searchable catalogue, with a focus on the Polish job market.';
+const SITE_GITHUB = 'https://github.com/qvertick/freehire-lite';
 
 /** One question/answer pair; the shape shared by the visible FAQ and its schema. */
 export type FaqItem = { question: string; answer: string };
@@ -83,26 +83,26 @@ export function companyMetaDescription(company: Company, max = 200): string {
 
   let text: string;
   if (lead && factClause) {
-    text = `${lead} — ${factClause}. Open roles on freehire.`;
+    text = `${lead} — ${factClause}. Open roles on ${SITE}.`;
   } else if (lead) {
-    text = `${lead}. Open roles at ${company.name} on freehire.`;
+    text = `${lead}. Open roles at ${company.name} on ${SITE}.`;
   } else if (factClause) {
-    text = `${company.name}: ${factClause}. Open roles on freehire.`;
+    text = `${company.name}: ${factClause}. Open roles on ${SITE}.`;
   } else {
-    text = `Open jobs at ${company.name}, aggregated by freehire.`;
+    text = `Open jobs at ${company.name}, aggregated by ${SITE}.`;
   }
 
   if (text.length <= max) return text;
   return `${text.slice(0, max - 1).trimEnd()}…`;
 }
 
-/** "<title> — <company> · freehire" for the document title. */
+/** "<title> — <company> · Job Searcher" for the document title. */
 export function jobPageTitle(job: Job): string {
   const lead = job.company ? `${job.title} — ${job.company}` : job.title;
   return `${lead} · ${SITE}`;
 }
 
-/** "<name> — <n> open jobs · freehire" for a company page's document title.
+/** "<name> — <n> open jobs · Job Searcher" for a company page's document title.
  *
  *  The bare "<name> · freehire" it replaces ran as short as 18 characters, which
  *  left most of the SERP title width unused and read identically whether the
@@ -120,7 +120,7 @@ export function companyPageTitle(name: string, total: number | undefined): strin
   return `${name} — ${roles} · ${SITE}`;
 }
 
-/** "<n> companies hiring in tech · freehire" for the /companies directory title.
+/** "<n> companies with open jobs · Job Searcher" for the /companies directory title.
  *
  *  The bare "Companies · freehire" it replaces was 20 characters that named no
  *  subject: nothing in it could match a query, and most of the SERP title width went
@@ -128,14 +128,14 @@ export function companyPageTitle(name: string, total: number | undefined): strin
  *  the page's own heading and its ItemList describe.
  *
  *  No count (search failed) or a zero one falls back to the subject alone — the
- *  directory is a real page when a filter matches nothing, and "0 companies hiring"
+ *  directory is a real page when a filter matches nothing, and "0 companies"
  *  is an argument against clicking. */
 export function companiesPageTitle(total: number | undefined): string {
-  if (!total) return `Companies hiring in tech · ${SITE}`;
+  if (!total) return `Companies with open jobs · ${SITE}`;
   // Pinned locale, like companyPageTitle: crawler-visible metadata, so SSR and the
   // client recompute must group digits identically.
   const count = total.toLocaleString('en-US');
-  const subject = total === 1 ? 'company hiring in tech' : 'companies hiring in tech';
+  const subject = total === 1 ? 'company with open jobs' : 'companies with open jobs';
   return `${count} ${subject} · ${SITE}`;
 }
 

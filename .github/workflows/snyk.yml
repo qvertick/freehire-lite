@@ -40,7 +40,6 @@ on:
     branches: [main]
     paths:
       - 'web/**'
-      - 'extension/**'
       - 'design-system/**'
       - 'pnpm-lock.yaml'
       - 'package.json'
@@ -73,8 +72,8 @@ jobs:
           cat >> "$GITHUB_STEP_SUMMARY" <<'SUMMARY'
           ## Snyk did not run
 
-          No `SNYK_TOKEN` was visible to this run, so the four JS lockfiles (root,
-          `design-system/`, `web/`, `extension/`) were **not scanned** for known
+          No `SNYK_TOKEN` was visible to this run, so the three JS lockfiles (root,
+          `design-system/`, `web/`) were **not scanned** for known
           vulnerabilities.
 
           On a Dependabot pull request that usually does not mean the secret is missing:
@@ -124,9 +123,8 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: snyk test
 
-      # design-system is a `link:`/`file:` dependency for web/extension and does
-      # not install its own deps transitively — same trap as ci.yml and
-      # extension.yml.
+      # design-system is linked into web/ and does not install its own deps
+      # transitively — same trap as ci.yml.
       - name: Install design-system dependencies
         working-directory: design-system
         run: pnpm install --frozen-lockfile
@@ -150,13 +148,3 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: snyk test --all-projects
-
-      - name: Install extension dependencies
-        working-directory: extension
-        run: npm ci
-
-      - name: Test extension dependencies
-        working-directory: extension
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: snyk test

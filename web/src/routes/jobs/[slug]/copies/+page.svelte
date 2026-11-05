@@ -18,8 +18,6 @@
 
 <Seo title={`${data.job.title} — locations`} {canonical} />
 <svelte:head>
-  <!-- A navigation aggregate over the per-city job pages (which are themselves
-       indexable); the list page adds no unique content, so keep it out of the index. -->
   <meta name="robots" content="noindex, follow" />
 </svelte:head>
 
@@ -49,19 +47,15 @@
   {#if hasPrev || hasNext}
     <nav class="mt-5 flex items-center justify-between text-sm">
       {#if hasPrev}
-        <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- copiesHref is already resolve()'d; only a query-string offset is appended, which the linter can't trace through the variable -->
-        <a href={prevHref} class="font-medium text-brand-strong hover:underline" data-sveltekit-reset="false"
-          >← Previous</a
-        >
+        <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- pagination URL preserves the current route and adds its offset. -->
+        <a href={prevHref} class="font-medium text-brand-strong hover:underline" data-sveltekit-reset="false">← Previous</a>
       {:else}
         <span></span>
       {/if}
       <span class="text-muted-foreground">{from}–{to} of {data.total}</span>
       {#if hasNext}
-        <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- copiesHref is already resolve()'d; only a query-string offset is appended, which the linter can't trace through the variable -->
-        <a href={nextHref} class="font-medium text-brand-strong hover:underline" data-sveltekit-reset="false"
-          >Next →</a
-        >
+        <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- pagination URL preserves the current route and adds its offset. -->
+        <a href={nextHref} class="font-medium text-brand-strong hover:underline" data-sveltekit-reset="false">Next →</a>
       {:else}
         <span></span>
       {/if}

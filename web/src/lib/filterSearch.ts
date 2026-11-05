@@ -127,15 +127,6 @@ function buildJobCatalog(): FilterSearchHit[] {
   pushFacet(hits, 'industry', 'domains');
   pushFacet(hits, 'industry', 'company_type');
   pushFacet(hits, 'industry', 'collections', JOB_COLLECTION, 'Collection');
-  hits.push({
-    ...actionHit('company_slug', 'Company', 'Hiring again', 'former-employers'),
-    param: 'company_slug',
-    aliases: ['former employers', 'past employers', 'previous employers'],
-  });
-  hits.push({
-    ...actionHit('posted', 'Posted', 'Hide viewed', 'hide-seen'),
-    aliases: ['viewed', 'seen', 'opened', 'already viewed'],
-  });
   pushFacet(hits, 'source', 'source_type');
   for (const [value, label] of Object.entries(SOURCE_LABELS)) {
     hits.push(optionHit('source', 'source', 'Source', { value, label }));
@@ -148,11 +139,6 @@ function buildJobCatalog(): FilterSearchHit[] {
   pushFacet(hits, 'relocation', 'relocation');
   pushFacet(hits, 'relocation', 'collections', EMPLOYER_CREDENTIALS, 'Employer credentials');
   hits.push(actionHit('relocation', 'Visa', 'Offers visa sponsorship', 'visa'));
-  hits.push(
-    actionHit('relocation', 'AI interviews', 'Hide employers reported to interview with AI', 'hide-ai'),
-  );
-  hits.push(actionHit('relocation', 'Auto-apply', 'Auto-apply available', 'auto-apply'));
-  hits.push(actionHit('relocation', 'Application', 'Short application', 'short-apply'));
   pushFacet(hits, 'relocation', 'clearance_levels', undefined, 'Security clearance');
   return hits;
 }
@@ -161,8 +147,6 @@ export function jobFilterSearchItems(opts?: {
   exclude?: readonly string[];
   railKeys?: readonly string[];
   openWithin?: boolean;
-  formerEmployers?: boolean;
-  hideSeen?: boolean;
 }): FilterSearchHit[] {
   jobCatalog ??= buildJobCatalog();
   const exclude = new Set(opts?.exclude ?? []);
@@ -171,8 +155,6 @@ export function jobFilterSearchItems(opts?: {
     if (rails && !rails.has(hit.railKey)) return false;
     if (hit.param && exclude.has(hit.param)) return false;
     if (!opts?.openWithin && hit.action?.startsWith('open:')) return false;
-    if (!opts?.formerEmployers && hit.action === 'former-employers') return false;
-    if (!opts?.hideSeen && hit.action === 'hide-seen') return false;
     return true;
   });
 }

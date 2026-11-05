@@ -93,62 +93,39 @@
           usually mean a role is not really being filled.
         </p>
         <p>
-          <span class="text-foreground">A job I applied to is gone.</span> Postings disappear when
-          the source removes them. Anything you saved or tracked stays in your tracker with the
-          details as they were.
+          <span class="text-foreground">A job I was interested in is gone.</span> Postings disappear
+          when the source removes them. The employer’s original site is the source of truth for
+          application status.
         </p>
         <p>
-          <span class="text-foreground">The apply button opens someone else's site.</span> That is
-          the employer's own application form. freehire aggregates postings; it does not receive
-          applications, and never applies on your behalf.
-        </p>
-      </div>
-    </section>
-
-    <section class="flex flex-col gap-3">
-      <h2 class="text-xl font-semibold tracking-tight">Account and subscription</h2>
-      <div class="flex flex-col gap-3 text-sm leading-relaxed text-muted-foreground">
-        <p>
-          <span class="text-foreground">I cannot sign in.</span> If you first signed up with Google,
-          GitHub, LinkedIn or Apple, use that same button rather than a password — the account has no
-          password until you set one. If you did set one, use "Forgot password". Still stuck? Email us
-          from the address on the account.
-        </p>
-        <p>
-          <span class="text-foreground">How do I cancel Pro?</span> Where you bought it. A subscription
-          bought in the iPhone app is cancelled in
-          <a href="https://apps.apple.com/account/subscriptions" class={link}>Apple's subscription
-            settings</a>; one bought on the web is cancelled on your
-          <a href={resolve('/my/plan')} class={link}>plan page</a>. Cancelling stops the renewal — the
-          plan stays active until the period you already paid for ends.
-        </p>
-        <p>
-          <span class="text-foreground">A charge I do not recognise.</span> Refunds for an in-app
-          purchase are handled by Apple, not by us:
-          <a href="https://reportaproblem.apple.com" class={link}>reportaproblem.apple.com</a>. For a
-          card payment made on the web, email us and we will sort it out.
-        </p>
-        <p>
-          <span class="text-foreground">How do I delete my account?</span> From the app or the
-          website, in a few taps — see
-          <a href={resolve('/delete-account')} class={link}>deleting your account</a>. It is permanent:
-          no grace period, no recovery.
+          <span class="text-foreground">The apply button opens another site.</span> That is the
+          employer's original application page. freehire aggregates postings and does not receive
+          applications.
         </p>
       </div>
     </section>
 
     <section class="flex flex-col gap-3">
-      <h2 class="text-xl font-semibold tracking-tight">The mobile app</h2>
+      <h2 class="text-xl font-semibold tracking-tight">Using the job search</h2>
       <div class="flex flex-col gap-3 text-sm leading-relaxed text-muted-foreground">
         <p>
-          <span class="text-foreground">Notifications are not arriving.</span> Check that
-          notifications are allowed for freehire in your device settings, and that the device is
-          listed on your account. Signing out removes that device's registration.
+          <span class="text-foreground">A posting looks out of date.</span> Follow the link on the
+          vacancy page to check the employer’s original listing. You can also use the job removal
+          form to report a listing that should no longer appear.
         </p>
         <p>
-          <span class="text-foreground">The app and the website disagree.</span> They share one
-          account and one database, so this is almost always a stale screen — pull to refresh. If it
-          persists, tell us what each one showed.
+          <span class="text-foreground">I cannot find a role.</span> Try searching by a broader title,
+          location or category, then narrow the results with filters.
+        </p>
+      </div>
+    </section>
+
+    <section class="flex flex-col gap-3">
+      <h2 class="text-xl font-semibold tracking-tight">Mobile browsing</h2>
+      <div class="flex flex-col gap-3 text-sm leading-relaxed text-muted-foreground">
+        <p>
+          The website works on phones and tablets. If search results look stale, refresh the page
+          and try again.
         </p>
       </div>
     </section>
@@ -158,10 +135,6 @@
       <ul class="flex flex-col gap-2 text-sm leading-relaxed text-muted-foreground">
         <li><a href={resolve('/privacy')} class={link}>Privacy Policy</a> — what we collect and why.</li>
         <li><a href={resolve('/terms')} class={link}>Terms of Service</a>.</li>
-        <li>
-          <a href={resolve('/delete-account')} class={link}>Deleting your account</a> — how, and what
-          it removes.
-        </li>
         <li>
           <a href={resolve('/how-it-works')} class={link}>How freehire works</a> — where the jobs come
           from and how they are deduplicated.

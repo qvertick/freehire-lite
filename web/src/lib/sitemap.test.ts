@@ -10,9 +10,9 @@ import {
 } from './sitemap';
 
 describe('sitemap static paths', () => {
-  it('includes the collections hub and the for-companies page', () => {
+  it('includes the collections hub and role catalogue', () => {
     expect(STATIC_PATHS).toContain('/collections');
-    expect(STATIC_PATHS).toContain('/for-companies');
+    expect(STATIC_PATHS).toContain('/roles');
   });
 
   // Indexable pages that the job feed does not link to, so nothing but the sitemap
@@ -20,15 +20,8 @@ describe('sitemap static paths', () => {
   it('includes the data and API surfaces', () => {
     for (const path of [
       '/open',
-      '/trends',
       '/docs/api',
-      '/jobs-api',
-      '/agents',
-      '/cli',
-      '/mcp',
-      '/chatgpt',
-      '/roast',
-      '/contribute',
+      '/features/advanced-search',
       '/status',
       '/privacy',
     ]) {
@@ -40,11 +33,10 @@ describe('sitemap static paths', () => {
     expect(new Set(STATIC_PATHS).size).toBe(STATIC_PATHS.length);
   });
 
-  it('includes the feature landings', () => {
-    expect(STATIC_PATHS).toContain('/features/inbox');
-    expect(STATIC_PATHS).toContain('/features/referrals');
-    expect(STATIC_PATHS).toContain('/features/tailor');
-    expect(STATIC_PATHS).toContain('/features/interview-buddies');
+  it('excludes account and recruiting features', () => {
+    for (const path of ['/talent', '/for-companies', '/recruiters', '/features/inbox', '/features/tailor']) {
+      expect(STATIC_PATHS).not.toContain(path);
+    }
   });
 
   // /referrals now answers with a 301 to its new home. Listing a redirect in the

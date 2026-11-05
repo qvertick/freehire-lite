@@ -1,39 +1,27 @@
 <script lang="ts">
   import { SectionLabel } from '#lib/ui/index.js';
 
-  // The About page's values block — the promises behind the mission, shown only
-  // on /about (HomeView carries the mission and renders on / too, so these live
-  // in a standalone component to keep them off the landing page).
+  // The About page's principles.
   const values = [
     {
       n: '01',
-      title: 'For candidates, not recruiters.',
-      body: "When interests collide, the candidate wins — every time. No sponsored listings, no pay-to-rank, no selling your data to whoever pays. If a choice is good for us but bad for the person job-hunting, we don't make it.",
+      title: 'One search across supported sources.',
+      body: 'Search listings from multiple integrated job platforms through a shared interface instead of repeating the same search on every site.',
     },
     {
       n: '02',
-      title: 'The whole market, not a slice.',
-      body: "We pull from as many sources as we can — company boards, ATS platforms, niche feeds — so you see the full set of options, not a hand-picked subset. Nothing is hidden because it didn't pay to be shown.",
+      title: 'The original posting stays authoritative.',
+      body: 'Job Searcher helps you discover vacancies. The source listing remains the place to confirm details and apply.',
     },
     {
       n: '03',
-      title: 'From board to you, in minutes.',
-      body: "Fast everywhere it touches you — a site that responds instantly, and new postings that land in your feed while they're still fresh. We measure speed from the company's board all the way to the notification in your pocket.",
-    },
-    {
-      n: '04',
-      title: 'Open, so you can check.',
-      body: "freehire is open source and free to fork. You don't have to take our word that there's no catch — the code is right there. Transparency is how we keep the other promises honest.",
-    },
-    {
-      n: '05',
-      title: 'Built to last, not to flip.',
-      body: "We're not chasing an exit or a data sale. freehire is built to keep serving candidates for years — each improvement compounds instead of being a one-off, so it gets better the longer it runs.",
+      title: 'Search without an account.',
+      body: 'The public catalogue and its search filters are available without signing in.',
     },
   ];
 </script>
 
-<!-- Each value is a heading, so the five promises are reachable by heading navigation; a
+<!-- Each value is a heading, so the three promises are reachable by heading navigation; a
      <dl> could not carry that, since a <dt> may not contain one. -->
 <section class="border-t border-border py-16 sm:py-20">
   <SectionLabel as="h2" text="values" />
