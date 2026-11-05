@@ -2,14 +2,14 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
-  <img src="docs/assets/logo-light.svg" alt="freehire" width="84" height="84">
+  <img src="docs/assets/logo-dark.svg" alt="freehire-lite" width="84" height="84">
 </picture>
 
 # freehire
 
-### Every IT job, straight from the source.
-
-**4.7M+ live postings pulled directly from company career pages — no recruiters, no reposts, no dead links. Fully open source.**
+<h3 align="center">
+  <img src="https://readme-typing-svg.herokuapp.com?font=JetBrainsMono+Nerd+Font&size=18&pause=100&color=FFFFFF&center=true&width=560&lines=Every+job+has+a+source.;We+find+them+all.;One+search.+Hundreds+of+sources.;Turning+websites+into+searchable+data.;No+more+endless+tab+switching.;Collect.+Parse.+Normalize.+Search.;The+web+is+full+of+opportunities.;Let+the+parsers+do+the+work.;One+engine.+Multiple+job+platforms.;From+raw+HTML+to+real+opportunities.;Fresh+data.+Unified+search.;Stop+searching.+Start+finding.;Every+source.+One+destination.;Built+to+collect.+Designed+to+discover.;Your+job+search%2C+automated.">
+</h3>
 
 [**Try it live →**](https://freehire.me/?utm_source=github&utm_medium=readme&utm_campaign=hero) · [Features](docs/features.md) · [Architecture](docs/architecture.md) · [Sources](#sources) · [API](#api) · [Add a source](#adding-a-source) · [Contributing](CONTRIBUTING.md)
 
@@ -17,28 +17,6 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Go version](https://img.shields.io/github/go-mod/go-version/strelov1/freehire)
 ![Last commit](https://img.shields.io/github/last-commit/strelov1/freehire)
-[![Stars](https://img.shields.io/github/stars/strelov1/freehire?style=social)](https://github.com/strelov1/freehire/stargazers)
-[![Contributors](https://img.shields.io/github/contributors-anon/strelov1/freehire)](https://github.com/strelov1/freehire/graphs/contributors)
-[![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/79cgB9RRfx)
-
-[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/ijfaechijopdlikalojadpojmpilplnj?label=Chrome%20Web%20Store&logo=googlechrome&logoColor=white&color=4285F4)](https://chromewebstore.google.com/detail/freehire/ijfaechijopdlikalojadpojmpilplnj)
-[![Firefox Add-ons](https://img.shields.io/badge/Firefox%20Add--ons-install-FF7139?logo=firefoxbrowser&logoColor=white)](https://addons.mozilla.org/firefox/addon/freehire/)
-[![App Store](https://img.shields.io/badge/App%20Store-download-0D96F6?logo=appstore&logoColor=white)](https://apps.apple.com/app/freehire-open-job-search/id6801885119)
-
-<br>
-
-<!-- Product Hunt: launching 26 August 2026. The badge is Product Hunt's own embed,
-     one SVG per theme, picked by prefers-color-scheme the same way the logo above is.
-     Its own utm_campaign so this traffic is separable from the site footer's badge. -->
-<a href="https://www.producthunt.com/products/freehire?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-readme">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1196233&amp;theme=dark">
-    <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1196233&amp;theme=light" alt="freehire — every IT job, straight from the source | Product Hunt" width="250" height="54">
-  </picture>
-</a>
-<a href="https://trendshift.io/repositories/55060?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-55060" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/55060" alt="strelov1%2Ffreehire | Trendshift" width="250" height="55"/></a>
-
-<br>
 
 <img src="docs/assets/freehire.gif" alt="freehire — faceted search narrowing 4.7M+ live postings by region, work format, specialization and seniority, each linking straight to the company's own careers page" width="860">
 
@@ -70,41 +48,21 @@ what [freehire.me/jobs](https://freehire.me/jobs?utm_source=github&utm_medium=re
 
 ## Free and Pro
 
-[freehire.me](https://freehire.me/?utm_source=github&utm_medium=readme&utm_campaign=plans) is free for finding and tracking a job,
-for good: every posting and every filter, AI search, alerts by email, Telegram and
-push, the application board, the inbox that sorts employer replies, and search from
-ChatGPT, Claude or any agent over MCP.
-
-**Pro — $5/month** adds the AI that does the applying with you:
-
-- **CV tailoring for each vacancy**, with a cover letter — it invents nothing
-- **The AI assistant**, unlimited
-- **The browser extension fills application forms** for you
-- **Auto-apply in the background**, within a daily limit
-- Members-only channels on the community Discord
-
-Cancel any time; not what you expected — email within 14 days for a refund.
-**[See plans →](https://freehire.me/pricing?utm_source=github&utm_medium=readme&utm_campaign=plans)**
+[freehire.me](https://freehire.me/) is a public job search engine. Search and filter
+IT and non-IT vacancies from multiple sources, then follow the original posting to
+apply directly with the employer.
 
 > If freehire saves you time — or you just like the idea of jobs straight from the
 > source — a ⭐ helps other people find it.
 
-## Beyond the catalogue
-
-Finding the posting is half the problem. The other half — writing the CV,
-sending it, and knowing what happened to it — is built on the same data, in the
-same repository, under the same licence.
+## How it works
 
 | | |
 | --- | --- |
-| **Find** | Faceted search, curated collections, saved searches with email/Telegram digests, shared boards, market analytics, the ghost-job signal |
-| **Apply** | CV builder with ATS-safe PDF templates, deterministic CV↔vacancy scoring, AI fit analysis, CV tailoring that invents nothing, tracer links, referrals |
-| **Track** | An application board with stages, a mail inbox that links recruiter replies to the application they answer, an append-only event ledger, reminders |
-| **Ask** | An in-process agent with five presets — chat, browse, profile, CV tailoring, interview rehearsal — with no shell and no minted credential |
-| **Build on** | A keyless public API, a [CLI](https://github.com/strelov1/freehire-cli), an [MCP server](https://github.com/strelov1/freehire-mcp) for Claude Desktop and Claude Code, a form-filling browser extension, ChatGPT Actions |
-
-**[Full feature reference → `docs/features.md`](docs/features.md)** — what each one
-does, where it lives in the tree, and which need an LLM endpoint configured.
+| **Collect** | Source adapters fetch vacancies and refresh their status |
+| **Normalize** | A shared pipeline maps source data to one job schema and deduplicates postings |
+| **Search** | PostgreSQL stores the catalogue; Meilisearch serves keyword search, filters and sorting |
+| **Browse** | A public frontend presents job and company pages with links to the original postings |
 
 ## Stack
 
@@ -193,13 +151,11 @@ hard-deletes jobs; the lifecycle only soft-closes them.
 cmd/                 entry points: server + the standalone workers above
 migrations/          SQL schema (source for both sqlc and initdb)
 web/                 the SvelteKit frontend
-extension/           the Chrome side-panel extension
-design-system/       shared tokens and components, linked into web/ and extension/
+design-system/       shared tokens and components, linked into web/
 internal/            ~130 domain packages; the load-bearing ones:
   config/            env configuration
   database/ db/      pgxpool pool; generated sqlc code + queries/*.sql
   handler/           HTTP handlers
-  auth/              auth primitives (JWT cookie, API keys) + OAuth sign-in
   sources/           source adapters (greenhouse / lever / adzuna / …) + registry
   boardcatalog/      the board catalog: which company crawls on which ATS, under what board id
   pipeline/          ingest runner (fetch → normalize → dedup → upsert)
@@ -211,23 +167,14 @@ internal/            ~130 domain packages; the load-bearing ones:
   location/ classify/ skilltag/  the curated facet dictionaries — never guess, emit nothing
   ghost/             the posting-reality signal behind "is this job real?"
   jobview/           the single public wire shape of a job
-  cv/ cvedit/        structured CVs + PDF rendering; cvedit is their only writer
-  experience/        durable employments + evidence atoms behind every CV claim
-  cvmatch/ matchanalysis/  deterministic CV↔vacancy score; the LLM fit analysis on top
-  applyform/         captured ATS application forms, in the platform's own vocabulary
-  userjob/ appevent/ per-user tracking (view / apply / save / stages) + the event ledger
-  inbox/             recruiter mail → classify → link to an application
-  assistant/         the in-process agent: turn loop, tools, transcripts
-  browsertools/      relays tool frames between the agent and the browser extension
-  referral/ collections/  employee referrals; curated company tags
-  llm/ llmkey/       provider-agnostic LLM client + per-user spend attribution
+  collections/       curated company collections
 ```
 
 ## Architecture
 
 How the pieces fit together — the crawl-to-search topology, what each directory
-above is for, and walkthroughs of the three main flows (finding a job, tailoring a
-CV, the in-app assistant), plus the auth model, notifications and the job
+above is for, and walkthroughs of the two main flows (ingestion and public job
+search), plus the job
 lifecycle: **[docs/architecture.md](docs/architecture.md)**.
 
 It is the map; the per-package `AGENTS.md` files it links to are the territory.
@@ -288,18 +235,8 @@ new provider before any code.
 A server-rendered SvelteKit 2 app (Svelte 5 runes, Tailwind 4, `adapter-node`)
 lives under `web/` and consumes the API same-origin; a dev Vite proxy forwards
 `/api` to the backend. Shared tokens and components come from the sibling
-`design-system/` package — install it before building `web/` or `extension/`,
-since it is symlinked, not copied. See [web/AGENTS.md](web/AGENTS.md).
-
-## Browser extension
-
-A Chrome extension puts the job-application agent in a side panel next to
-whatever posting you're on: it reads the page when you ask it something, shows
-a deterministic skill-coverage match against your freehire profile, and can
-fill the application form for you. Source lives under `extension/`
-([extension/AGENTS.md](extension/AGENTS.md)).
-
-**[Install it from the Chrome Web Store →](https://chromewebstore.google.com/detail/freehire/ijfaechijopdlikalojadpojmpilplnj?hl=en-US&utm_source=ext_sidebar)**
+`design-system/` package — install it before building `web/`, since it is
+symlinked, not copied. See [web/AGENTS.md](web/AGENTS.md).
 
 ## Contributing
 
