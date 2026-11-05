@@ -260,16 +260,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the checks CI runs and
   <img src="https://contrib.rocks/image?repo=strelov1/freehire" alt="Contributors" />
 </a>
 
-## Star History
-
-<a href="https://star-history.com/#strelov1/freehire&Date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=strelov1/freehire&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=strelov1/freehire&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=strelov1/freehire&type=Date" />
-  </picture>
-</a>
-
 ## Security
 
 Found a vulnerability? Report it privately — see [SECURITY.md](SECURITY.md). Do
