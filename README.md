@@ -145,31 +145,6 @@ go run ./cmd/backfill-derive     # re-derive every deterministic column — face
 Every worker needs `DATABASE_URL` and exits non-zero on failure. No worker
 hard-deletes jobs; the lifecycle only soft-closes them.
 
-## Layout
-
-```
-cmd/                 entry points: server + the standalone workers above
-migrations/          SQL schema (source for both sqlc and initdb)
-web/                 the SvelteKit frontend
-design-system/       shared tokens and components, linked into web/
-internal/            ~130 domain packages; the load-bearing ones:
-  config/            env configuration
-  database/ db/      pgxpool pool; generated sqlc code + queries/*.sql
-  handler/           HTTP handlers
-  sources/           source adapters (greenhouse / lever / adzuna / …) + registry
-  boardcatalog/      the board catalog: which company crawls on which ATS, under what board id
-  pipeline/          ingest runner (fetch → normalize → dedup → upsert)
-  linksource/        resolves outbound job links found in Telegram posts
-  telegram/          Telegram-channel crawl + LLM vacancy extraction
-  enrich/            typed AI-enrichment contract + queue-draining runner
-  search/ searchdrain/  Meilisearch indexing and query; incremental drain of the write queue
-  embed/             semantic chunk embeddings into pgvector
-  location/ classify/ skilltag/  the curated facet dictionaries — never guess, emit nothing
-  ghost/             the posting-reality signal behind "is this job real?"
-  jobview/           the single public wire shape of a job
-  collections/       curated company collections
-```
-
 ## Architecture
 
 How the pieces fit together — the crawl-to-search topology, what each directory
