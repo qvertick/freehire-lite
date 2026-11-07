@@ -128,25 +128,32 @@ go run ./cmd/search-drain  # push queued job writes into the live search index (
 go run ./cmd/reindex       # rebuild the Meilisearch index from Postgres (full swap)
 ```
 
-Other source adapters and maintenance workers are available under `cmd/`. They
-are independent of the public search server and can be enabled as needed.
+Every worker needs `DATABASE_URL` and exits non-zero on failure. No worker
+hard-deletes jobs; the lifecycle only soft-closes them.
 
 ## Layout
 
 ```
-cmd/                 API server and standalone ingestion/index workers
+cmd/                 entry points: server + the standalone workers above
 migrations/          SQL schema (source for both sqlc and initdb)
 web/                 the SvelteKit frontend
 design-system/       shared tokens and components, linked into web/
-internal/            domain packages; the core search pipeline:
-  api/handler/        HTTP handlers
-  dict/               curated facet dictionaries and normalization
-  ingest/sources/     source adapters and provider registry
-  ingest/boardcatalog/ board catalog: providers, companies and boards
-  ingest/pipeline/    fetch → normalize → deduplicate → upsert
-  job/jobview/        public wire projection of a job
-  platform/db/        database access, queries and generated sqlc code
-  search/              Meilisearch queries and incremental index updates
+internal/            ~130 domain packages; the load-bearing ones:
+  config/            env configuration
+  database/ db/      pgxpool pool; generated sqlc code + queries/*.sql
+  handler/           HTTP handlers
+  sources/           source adapters (greenhouse / lever / adzuna / …) + registry
+  boardcatalog/      the board catalog: which company crawls on which ATS, under what board id
+  pipeline/          ingest runner (fetch → normalize → dedup → upsert)
+  linksource/        resolves outbound job links found in Telegram posts
+  telegram/          Telegram-channel crawl + LLM vacancy extraction
+  enrich/            typed AI-enrichment contract + queue-draining runner
+  search/ searchdrain/  Meilisearch indexing and query; incremental drain of the write queue
+  embed/             semantic chunk embeddings into pgvector
+  location/ classify/ skilltag/  the curated facet dictionaries — never guess, emit nothing
+  ghost/             the posting-reality signal behind "is this job real?"
+  jobview/           the single public wire shape of a job
+  collections/       curated company collections
 ```
 
 ## Architecture
@@ -237,16 +244,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the checks CI runs and
 
 <a href="https://github.com/strelov1/freehire/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=strelov1/freehire" alt="Contributors" />
-</a>
-
-## Star History
-
-<a href="https://star-history.com/#strelov1/freehire&Date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=strelov1/freehire&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=strelov1/freehire&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=strelov1/freehire&type=Date" />
-  </picture>
 </a>
 
 ## Security
