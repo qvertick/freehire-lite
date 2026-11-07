@@ -24,21 +24,18 @@
 
 ## Why freehire?
 
-- **Straight from the source.** Every listing is crawled directly from a company's
-  own ATS — Workday, Greenhouse, Lever, Ashby, iCIMS and a long tail of others — and
-  links to the original posting. No recruiter reposts, no aggregator middlemen, no
-  dead links.
+- **Many sources, one catalogue.** Company ATS platforms, career sites and job
+  boards feed a shared pipeline. Listings retain their source link, and duplicate
+  postings are collapsed.
 - **One schema, deduplicated.** The same role posted to three boards collapses into
   one entry: every posting is normalized into a single shape and deduplicated on a
   stable key.
 - **Search that understands jobs.** Faceted full-text search over region, work mode,
   seniority, skills and salary — derived from curated dictionaries, never guessed.
 - **Actually open.** MIT-licensed and self-hostable, pipeline and data both in the
-  open. Adding a company is one row in the board catalog
-  ([how](#adding-a-source)).
-- **Yours to build on.** A clean HTTP API, a CLI, Telegram digests, and a whole
-  workspace on top of the catalogue — see [Beyond the catalogue](#beyond-the-catalogue).
-  Use the hosted site, run your own, or build on top.
+  open. Adding a company is one row in the board catalog ([how](#adding-a-source)).
+- **Yours to build on.** A public HTTP API and an open-source collection and search
+  pipeline. Use the hosted site, run your own, or build on top.
 
 Aggregating **4.7M+ unique live postings** from **700,000+ companies** across
 **168 ATS platforms**, a long tail of aggregators and direct feeds, and **97
@@ -46,11 +43,11 @@ Telegram channels** — **421 sources** in all, see [Sources](#sources) for the 
 breakdown. Reposts of one job across boards are collapsed, so every figure here is
 what [freehire.me/jobs](https://freehire.me/jobs?utm_source=github&utm_medium=readme&utm_campaign=stats) actually shows.
 
-## Free and Pro
+## Public job search
 
 [freehire.me](https://freehire.me/) is a public job search engine. Search and filter
 IT and non-IT vacancies from multiple sources, then follow the original posting to
-apply directly with the employer.
+the employer's own site.
 
 > If freehire saves you time — or you just like the idea of jobs straight from the
 > source — a ⭐ helps other people find it.
@@ -67,15 +64,12 @@ apply directly with the employer.
 ## Stack
 
 - **Go** + [Fiber v2](https://gofiber.io/) — HTTP server
-- **PostgreSQL** + [pgvector](https://github.com/pgvector/pgvector) — storage, filtering, semantic embeddings
+- **PostgreSQL** — the normalized job catalogue and source data
 - **[sqlc](https://sqlc.dev/)** — type-safe DB access from SQL (no ORM)
-- **[Meilisearch](https://www.meilisearch.com/)** — full-text and faceted job search
-- **[langchaingo](https://github.com/tmc/langchaingo)** — LLM access over any OpenAI-compatible endpoint (no vendor baked in)
-- **[Bifrost](https://github.com/maximhq/bifrost)** — LLM gateway: per-user virtual keys, cross-provider fallback, spend tracking
-- **[Langfuse](https://langfuse.com/)** — LLM call tracing and observability
+- **[Meilisearch](https://www.meilisearch.com/)** — keyword search, filters and sorting
 - **[SvelteKit](https://kit.svelte.dev/) 2** (Svelte 5 runes) + **Tailwind 4** — the server-rendered frontend under `web/`
-- **Redis** — rate limiting and realtime fan-out · **S3-compatible object storage** — CVs, headshots, previews
-- **[Prometheus](https://prometheus.io/)** (via the node_exporter textfile collector) + **[Grafana](https://grafana.com/)** — metrics and dashboards for the ingest/LLM infrastructure
+- **Go workers** — source ingestion, job refresh and search-index maintenance
+- **Redis** — shared API rate limiting
 - **Docker Compose** — local development
 
 ## Quick start
@@ -106,9 +100,9 @@ docker compose up -d db   # database only
 make run                  # server on host, reads DATABASE_URL
 ```
 
-Copy `.env.example` to `.env` and adjust as needed. `JWT_SECRET` is required for
-the server to start; OAuth and LLM credentials are optional (the features they
-gate stay disabled when unset).
+Copy `.env.example` to `.env` and adjust as needed. The current server also
+requires `JWT_SECRET` at startup; source-specific credentials are needed only for
+sources that require them.
 
 ## Commands
 
@@ -123,51 +117,36 @@ make migrate   # apply migrations manually to an existing DB volume
 
 ## Workers
 
-The server only serves the API. Everything else — crawling, enrichment, indexing,
-notifications — is a standalone, run-once worker meant for cron: it crawls or
-drains its queue and exits. `ls cmd/` for the full list; the ones you are most
-likely to run:
+Ingestion and search-index maintenance run as standalone, run-once workers. A
+worker processes its assigned work and exits, so it can be scheduled with cron or
+another job runner. The core commands are:
 
 ```bash
 go run ./cmd/migrate       # apply pending migrations (run before deploying code that reads new schema)
 go run ./cmd/ingest greenhouse  # crawl one provider's catalog boards and upsert jobs (also via INGEST_PROVIDER)
-go run ./cmd/enrich        # drain the enrichment queue (LLM); needs LLM_* config
-go run ./cmd/embed         # drain the semantic queue into pgvector chunks
 go run ./cmd/search-drain  # push queued job writes into the live search index (run every 1-2 min)
 go run ./cmd/reindex       # rebuild the Meilisearch index from Postgres (full swap)
-go run ./cmd/tg-ingest     # crawl the active channels in telegram_channels
-go run ./cmd/tg-extract    # LLM-extract vacancies from crawled Telegram posts
-go run ./cmd/capture-apply-form  # fetch queued postings' ATS application forms
-go run ./cmd/backfill-derive     # re-derive every deterministic column — facets, fingerprints,
-                                 # slugs — in one keyset pass (follow with make reindex)
 ```
 
-Every worker needs `DATABASE_URL` and exits non-zero on failure. No worker
-hard-deletes jobs; the lifecycle only soft-closes them.
+Other source adapters and maintenance workers are available under `cmd/`. They
+are independent of the public search server and can be enabled as needed.
 
 ## Layout
 
 ```
-cmd/                 entry points: server + the standalone workers above
+cmd/                 API server and standalone ingestion/index workers
 migrations/          SQL schema (source for both sqlc and initdb)
 web/                 the SvelteKit frontend
 design-system/       shared tokens and components, linked into web/
-internal/            ~130 domain packages; the load-bearing ones:
-  config/            env configuration
-  database/ db/      pgxpool pool; generated sqlc code + queries/*.sql
-  handler/           HTTP handlers
-  sources/           source adapters (greenhouse / lever / adzuna / …) + registry
-  boardcatalog/      the board catalog: which company crawls on which ATS, under what board id
-  pipeline/          ingest runner (fetch → normalize → dedup → upsert)
-  linksource/        resolves outbound job links found in Telegram posts
-  telegram/          Telegram-channel crawl + LLM vacancy extraction
-  enrich/            typed AI-enrichment contract + queue-draining runner
-  search/ searchdrain/  Meilisearch indexing and query; incremental drain of the write queue
-  embed/             semantic chunk embeddings into pgvector
-  location/ classify/ skilltag/  the curated facet dictionaries — never guess, emit nothing
-  ghost/             the posting-reality signal behind "is this job real?"
-  jobview/           the single public wire shape of a job
-  collections/       curated company collections
+internal/            domain packages; the core search pipeline:
+  api/handler/        HTTP handlers
+  dict/               curated facet dictionaries and normalization
+  ingest/sources/     source adapters and provider registry
+  ingest/boardcatalog/ board catalog: providers, companies and boards
+  ingest/pipeline/    fetch → normalize → deduplicate → upsert
+  job/jobview/        public wire projection of a job
+  platform/db/        database access, queries and generated sqlc code
+  search/              Meilisearch queries and incremental index updates
 ```
 
 ## Architecture
