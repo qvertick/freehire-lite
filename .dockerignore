@@ -1,3 +1,4 @@
+# standard ignores freehire
 web/node_modules
 web/dist
 web/.svelte-kit
@@ -7,3 +8,16 @@ design-system/dist
 .git
 openspec
 design-system/storybook-static/
+# ignores freehire-lite
+.env
+.env.*
+!.env.example
+# на всякий случай, чтобы не залить контейнер лишние файлы
+*.log
+.idea
+.vscode
+# игнор тестов
+coverage
+# .DS_Store служебные файлы macOS и Windows
+.DS_Store
+Thumbs.db

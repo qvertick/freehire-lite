@@ -1,63 +1,52 @@
-# --- build stage ---
 FROM golang:1.27-alpine AS build
+# AS - имя сборки, чтобы потом можно было использовать его в другом месте
 WORKDIR /src
-
-# Cache dependencies in a separate layer.
-COPY go.mod go.sum* ./
+# рабочая директория внутри контейнера
+COPY go.mod go.sum ./
+# копируем файлы go.mod и go.sum в рабочую директорию контейнера ( для установки зависимостей )
 RUN go mod download
-
+# ----------------------------------------------- #
 COPY . .
-# One image carries every binary: the HTTP server (default entrypoint) plus the
-# run-once workers (ingest/enrich/reindex and the Telegram crawl/extract pair),
-# which prod invokes on a schedule via `docker compose run --rm app /app/<worker>`.
-#
-# Two invocations rather than one per binary: with `-o /out/` (a directory) Go
-# names each binary after its cmd dir — which is already how they're named — and
-# building them together shares one dependency compile and links them in
-# parallel. Cold-cache: 26s -> 17s locally, 72s -> ~50s on a CI runner. Only the
-# server needs an output name of its own.
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/hire ./cmd/server \
+# копируем все файлы проекта в рабочую директорию контейнера
+RUN mkdir -p /out \
+ && CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/hire ./cmd/server \
  && CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/ \
       ./cmd/ingest ./cmd/enrich ./cmd/reindex ./cmd/tg-ingest ./cmd/tg-extract \
       ./cmd/backfill-derive ./cmd/liveness ./cmd/notify ./cmd/import-collections \
       ./cmd/recount-companies ./cmd/migrate
-
-# --- typst stage: fetch the pinned, statically-linked typst binary used to render CV
-# PDFs (internal/cv). The musl build is fully static, so it runs on distroless/static;
-# Libertinus Serif is embedded in the binary, so no fonts are bundled separately. Pinned
-# to match the version verified against the ATS extraction test (local == prod output). ---
-FROM alpine:3.24 AS typst
-ARG TYPST_VERSION=0.15.0
-# hadolint ignore=DL3018
+# ------------------------------------------------ #
+FROM alpine:3.24 AS typst1
+ARG TYPST_VERSION=0.15.0 
+# скачиваем и распаковываем бинарник typst
 RUN apk add --no-cache curl xz \
- && curl -fsSL "https://github.com/typst/typst/releases/download/v${TYPST_VERSION}/typst-x86_64-unknown-linux-musl.tar.xz" -o /tmp/typst.tar.xz \
+&& curl -fsSL "https://github.com/typst/typst/releases/download/v${TYPST_VERSION}/typst-x86_64-unknown-linux-musl.tar.xz" -o /tmp/typst.tar.xz \
  && tar -xJf /tmp/typst.tar.xz -C /tmp \
  && install -m 0755 /tmp/typst-x86_64-unknown-linux-musl/typst /usr/local/bin/typst \
  && /usr/local/bin/typst --version
-
-# --- runtime stage ---
-# debian-slim (not distroless/static) because résumé text extraction shells out to
-# poppler's `pdftotext`, which has no static build to bundle the way typst does. The Go
-# binaries stay CGO_ENABLED=0 static, so they run here unchanged. ca-certificates backs
-# outbound TLS (LLM/S3/Meili/OAuth); a non-root user (uid 65532, matching the previous
-# distroless nonroot) keeps volume ownership stable.
-FROM debian:stable-slim
+# --- runtime stage --- #
+FROM debian:stable-slim AS runtime
+# slim - минимальный образ, без лишних пакетов, 'AS runtime' тут для того, чтобы потом можно было
+# использовать его в другом месте, но по сути это конечный образ, который будет использоваться для запуска приложения.
+# Tак что можно было бы и не писать AS runtime
 WORKDIR /app
-# hadolint ignore=DL3008
 RUN apt-get update \
  && apt-get install -y --no-install-recommends poppler-utils ca-certificates \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --system --gid 65532 nonroot \
  && useradd --system --uid 65532 --gid nonroot --home-dir /app nonroot \
  && pdftotext -v
+
 COPY --from=build /out/hire /out/ingest /out/enrich /out/reindex /out/tg-ingest /out/tg-extract /out/backfill-derive /out/liveness /out/notify /out/import-collections /out/recount-companies /out/migrate /app/
-# The migration runner reads its *.sql files from the image (WORKDIR /app, default
-# -dir migrations), so /app/migrate works the same as `go run ./cmd/migrate` on the host.
+# Копируем бинарники из сборочного контейнера build в рабочую директорию контейнера runtime
 COPY --from=build /src/migrations /app/migrations
-# CV PDF rendering: the typst binary + the env that points the server at it. Absent this
-# the CV builder still works and the PDF endpoint returns 501 (config resolves via LookPath).
-COPY --from=typst /usr/local/bin/typst /app/typst
+# Копируем директорию migrations из сборочного контейнера build в рабочую директорию
+# контейнера runtime, для того, чтобы при запуске контейнера можно было использовать миграции базы данных.
+COPY --from=typst1 /usr/local/bin/typst /app/typst
+# Копируем бинарник typst из контейнера typst1 в рабочую директорию контейнера runtime
 ENV TYPST_BIN=/app/typst
+# Создает переменную окружения TYPST_BIN внутри контейнера runtime, которая указывает на путь к бинарнику typst внутри контейнера.
 EXPOSE 8080
+# Открывает порт 8080 внутри контейнера, чтобы можно было подключаться к приложению,
+# которое будет запущено внутри контейнера. НО не открывает сам порт 8080 наружу
 USER nonroot:nonroot
 ENTRYPOINT ["/app/hire"]
