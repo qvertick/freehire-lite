@@ -1,5 +1,9 @@
 # Google OAuth verification
 
+> **Not needed by this repository.** The Gmail connection this verified was removed with
+> the Job Searcher adaptation, together with `cmd/gmail-sync`. Kept as the runbook for
+> whoever restores the surface.
+
 What it takes to lift the "Google hasn't verified this app" screen from the Inbox
 connection, and the text to paste into the forms when we do it again.
 

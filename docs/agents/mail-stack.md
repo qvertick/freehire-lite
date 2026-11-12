@@ -1,15 +1,25 @@
 # Mail stack
 
-Eight packages and three workers turn inbound recruiter mail into linked, stage-advancing
-applications. Each package has a package doc explaining *what* it does; this file explains
-how they compose and where the traps are.
+> **Removed binaries.** `cmd/mail-ingest`, `cmd/gmail-sync`, `cmd/classify-mail`,
+> `cmd/cal-sync`, `cmd/mail-preview` and `cmd/capture-apply-form` were deleted with the
+> Job Searcher adaptation, and `cmd/server` mounts no mail route. A later dead-code sweep
+> deleted the packages that existed only to serve them: `internal/application/mailingest`
+> (SES inbound), `internal/application/calmatch` and `internal/application/calsync`
+> (calendar matching and sync). What remains below describes how the stored data is shaped
+> and what a future drainer must respect; read every "worker" in this file as a role, not a
+> binary that currently ships.
+
+Seven packages work on inbound recruiter mail: they turn it into linked,
+stage-advancing applications. No worker currently drains them. Each package has a
+package doc explaining *what* it does; this file explains how they compose and where
+the traps are.
 
 ## The pipeline
 
 ```
                  ┌── Gmail OAuth ──→ internal/application/gmailsync ──┐
 inbound mail ────┤                                        ├──→ emails table
-                 └── SES→S3→SQS ──→ internal/application/mailingest ──┘    (source = gmail|hosted)
+                 └── SES→S3→SQS  (no drainer: mailingest removed)  ┘    (source = gmail|hosted)
                                                                       │
                                           email_classification_outbox │  ← excludes 'external'
                                                                       ▼
@@ -34,7 +44,6 @@ the point: it is the tier that costs us nothing. See the `external` bullets belo
 |---|---|
 | `internal/application/inbox` | The mail use cases (read, classify, link, record an application). Both readers call it |
 | `internal/application/gmailsync` | Incremental Gmail OAuth connect + per-user sync worker (`cmd/gmail-sync`) |
-| `internal/application/mailingest` | SES inbound: parse MIME → resolve recipient → store (`cmd/mail-ingest`, a daemon) |
 | `internal/application/mailbox` | Derives `<handle>@<MAILBOX_DOMAIN>`; pure — allocation lives in the handler |
 | `internal/application/maillink` | Drains the classification outbox, decides link + stage (`cmd/classify-mail`) |
 | `internal/application/mailmatch` | Deterministic match: thread continuity, company name in sender/subject |
@@ -135,11 +144,11 @@ the point: it is the tier that costs us nothing. See the `external` bullets belo
   attacker-controlled. An unknown signal is sanitized to `other` before anything is
   persisted or served — do not persist a raw model string.
 - **`MAILBOX_DOMAIN` ≠ `NOTIFY_EMAIL_FROM`.** The first is the *receiving* domain (mailbox
-  addresses; read by both the API's `mailboxReady` gate and `cmd/mail-ingest`); the second is
-  the SES *sending* identity for notifications. They may point at the same host — they are
-  still separate settings with separate IAM.
-- Recipient lookup in `mailingest` is **case-insensitive**; addresses are allocated
-  lowercase.
+  addresses; read by the API's `mailboxReady` gate); the second is the SES *sending*
+  identity for notifications. They may point at the same host — they are still separate
+  settings with separate IAM.
+- Recipient lookup in the deleted `mailingest` reader was **case-insensitive**; addresses
+  are allocated lowercase.
 - **The hosted recipient is `receipt.recipients`, never `mail.destination`.** SES publishes
   two recipient lists in the same notification and only one of them says where the message
   was delivered: `receipt.recipients` is the envelope RCPT TO that matched the receipt rule,
@@ -194,18 +203,20 @@ the point: it is the tier that costs us nothing. See the `external` bullets belo
   has none of ours, and an out-of-range position resolves to nothing by construction.
   *It never links, never advances a stage, never writes the ledger* — held by
   `TestMailRecallCannotLink`, which now walks both `Store` and `Mailbox`, and by a source
-  scan of the package for `LinkEmailToJob` / `application_events` / `calsync`.
-  **The calendar still needs no code**: `cmd/cal-sync` re-reads its whole ±90-day window
-  every run, so an invitation linked here yields its meeting on the next one.
-- **`internal/application/calsync` stores only meetings an application earned.** `cmd/cal-sync` reads each
-  connected candidate's calendar ±90 days around now and writes ONLY a meeting `calmatch` can
-  attach to one of the candidate's own applications — the schema backstops the rule
-  (`application_interviews.application_id` is NOT NULL), so a mistake cannot become a stored
-  dentist appointment. The whole window is re-read on every run; there is no incremental
-  state to drift. The only status ever written is `confirmed`. Connections are filtered by
-  the scopes recorded at consent, so a Google grant that predates the calendar consent never
-  reaches the worker and never costs an API call to discover. The worker shares the Gmail
-  Google grant and `gmailsync.CalendarScope`, and nothing else.
+  scan of the package for `LinkEmailToJob` / `application_events`.
+  **The calendar has no code any more**: `cmd/cal-sync` used to re-read its whole ±90-day
+  window every run, so an invitation linked here yielded its meeting on the next pass.
+  That worker, `calmatch` and `calsync` were removed in the dead-code sweep; the meetings
+  they stored stay in `application_interviews`.
+- **`application_interviews` holds only meetings an application earned.** The removed
+  `calsync` worker read each connected candidate's calendar ±90 days around now and wrote
+  ONLY a meeting `calmatch` could attach to one of the candidate's own applications — the
+  schema backstops the rule (`application_interviews.application_id` is NOT NULL), so a
+  mistake could never become a stored dentist appointment. The whole window was re-read on
+  every run; there was no incremental state to drift. The only status ever written is
+  `confirmed`. Connections were filtered by the scopes recorded at consent, so a Google
+  grant that predates the calendar consent never reached the worker. The worker shared the
+  Gmail Google grant and `gmailsync.CalendarScope`, and nothing else.
 - **Only `gmailsync.RevokedGrant` may cost a candidate their connection**, and both syncs ask
   it rather than deciding for themselves. `gmail_connections.status` is SHARED between mail
   and calendar (one grant covers both scopes), nothing but a browser consent clears it, and

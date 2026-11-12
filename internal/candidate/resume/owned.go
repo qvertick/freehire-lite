@@ -258,20 +258,6 @@ func (o Owned) ApplyTotalYears(st *resumeextract.Structured, now time.Time) {
 	st.TotalYears = st.EffectiveYears(now)
 }
 
-// AsStructured projects the identity subset onto the structured contact fields for
-// seed/heal — CV HEADER fields only (name/email/phone/location/links). Headline, summary,
-// languages, and certifications are body content, not header identity, so callers that
-// need those read the full StructureForSeed composition instead.
-func (o Owned) AsStructured() resumeextract.Structured {
-	return resumeextract.Structured{
-		FullName: o.FullName,
-		Email:    o.Email,
-		Phone:    o.Phone,
-		Location: o.Location,
-		Links:    append([]string(nil), o.Links...),
-	}
-}
-
 // OwnedFromStructured copies every field Owned tracks out of a structured résumé.
 func OwnedFromStructured(st resumeextract.Structured) Owned {
 	o := Owned{

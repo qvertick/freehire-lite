@@ -42,7 +42,7 @@ parses as nothing silently counts nothing.
   `job_daily_views.uniques`, which `GET /api/v1/stats/catalog` already publishes.
   `Page` exists because the API signal carries no bot filtering and this host's
   traffic is mostly crawlers: it is the only one of the two safe to rank a public
-  list on (`internal/engage/socialdigest`).
+  list on.
   `jobs.view_count` also accrues agent views from `internal/application/agentview`;
   this package's `uniques` does not.
 - `RotatedFiles(dir, base)` / `LogFile.Open()` — lists rotated files (skips the live

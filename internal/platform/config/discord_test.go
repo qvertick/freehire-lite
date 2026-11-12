@@ -52,13 +52,3 @@ func TestLoad_DiscordPaidAccessIsOffWhenAnyValueIsMissing(t *testing.T) {
 		})
 	}
 }
-
-// The digest webhook is a different Discord integration with a different credential, and
-// neither may switch the other on.
-func TestLoad_DiscordDigestWebhookDoesNotEnablePaidAccess(t *testing.T) {
-	t.Setenv("DISCORD_DIGEST_WEBHOOK_URL", "https://discord.example/api/webhooks/1/abc")
-
-	if Load().DiscordPaidAccessConfigured() {
-		t.Error("the digest webhook alone must not enable paid channels")
-	}
-}

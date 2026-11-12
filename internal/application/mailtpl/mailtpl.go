@@ -22,7 +22,6 @@ package mailtpl
 
 import (
 	"bytes"
-	"errors"
 	"html/template"
 	"io"
 	"strings"
@@ -172,31 +171,6 @@ func (l *Layout) RenderScheme(b Body, s Scheme) string {
 		DarkCSS:     darkCSS[s],
 	})
 	return buf.String()
-}
-
-// PinScheme rewrites an already-rendered document to a fixed colour scheme.
-//
-// It exists for previews. The mails are rendered by their own packages, each of
-// which builds its Layout internally, so a reviewer has no seam to pass a scheme
-// through — and threading one through six constructors would put a review-only
-// concern into the send path. Rewriting afterwards keeps it out.
-//
-// The rewrite is exact-literal, not a parse: this package emitted the document, so
-// it knows the byte-for-byte strings it is replacing. A miss is reported rather
-// than ignored, because a silently unpinned preview is a preview that quietly shows
-// the wrong thing.
-func PinScheme(document string, s Scheme) (string, error) {
-	if s == SchemeAuto {
-		return document, nil
-	}
-	autoStyle := string(darkCSS[SchemeAuto])
-	if !strings.Contains(document, autoStyle) {
-		return "", errors.New("mailtpl: document was not rendered by this package's shell")
-	}
-	out := strings.Replace(document, autoStyle, string(darkCSS[s]), 1)
-	return strings.ReplaceAll(out,
-		`content="`+colorSchemeMeta[SchemeAuto]+`"`,
-		`content="`+colorSchemeMeta[s]+`"`), nil
 }
 
 // darkCSS is the stylesheet each scheme emits.

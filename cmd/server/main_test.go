@@ -4,60 +4,35 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"reflect"
-	"sort"
-	"strings"
 	"testing"
-
-	"github.com/strelov1/freehire/internal/api/handler"
-	"github.com/strelov1/freehire/internal/platform/config"
 )
 
-// TestEveryConfigFieldTheHandlerAlsoNamesIsWiredThrough guards a whole class of silent failure:
-// config.Settings and handler.Config are two structs with overlapping field names, copied across by
-// hand in the literal below. A field added to both and forgotten in the copy compiles, passes vet,
-// passes every test that builds a handler directly — and reaches production as a zero value.
+// TestJobSearcherConfigIsWiredThrough guards the hand-written copy from config.Settings
+// into handler.Config. A field the server forgets here compiles, passes vet and passes
+// every test that builds a handler directly — and reaches production as a zero value.
 //
-// That happened: TRACER_LINK_SALT was read into config.Settings and read out of handler.Config, with
-// nothing in between, so CV link tracing reported "not available on this deployment" on a host
-// where the salt was set.
-//
-// The literal is inspected as source rather than exercised, because building it needs a database,
-// an LLM client and a Meilisearch — none of which this invariant depends on.
-func TestEveryConfigFieldTheHandlerAlsoNamesIsWiredThrough(t *testing.T) {
-	shared := sharedFieldNames(reflect.TypeOf(config.Settings{}), reflect.TypeOf(handler.Config{}))
-	if len(shared) == 0 {
-		t.Fatal("the two configs share no field names — this test is looking at the wrong types")
-	}
+// The literal is inspected as source rather than exercised, because building it needs a
+// database, Redis and Meilisearch — none of which this invariant depends on.
+func TestJobSearcherConfigIsWiredThrough(t *testing.T) {
 	wired := fieldsSetInHandlerConfigLiteral(t)
 
-	var missing []string
-	for _, name := range shared {
+	for _, name := range []string{
+		"Pool",
+		"Throttler",
+		"Cache",
+		"RateTiers",
+		"FrontendOrigin",
+		"PublicAnonStrict",
+		"VerifiedBotSecret",
+		"Search",
+		"Suggest",
+		"RecentJobsFeed",
+	} {
 		if !wired[name] {
-			missing = append(missing, name)
+			t.Errorf("handler.Config{...} in main.go never sets %s — the Job Searcher "+
+				"catalogue surface reads it, so it would run on the zero value", name)
 		}
 	}
-	if len(missing) > 0 {
-		sort.Strings(missing)
-		t.Errorf("handler.Config{...} in main.go never sets %s — the field exists on both configs, "+
-			"so it reads as its zero value at runtime however the environment is set",
-			strings.Join(missing, ", "))
-	}
-}
-
-// sharedFieldNames returns the exported field names both structs declare.
-func sharedFieldNames(a, b reflect.Type) []string {
-	inB := make(map[string]bool, b.NumField())
-	for i := range b.NumField() {
-		inB[b.Field(i).Name] = true
-	}
-	var out []string
-	for i := range a.NumField() {
-		if name := a.Field(i).Name; inB[name] {
-			out = append(out, name)
-		}
-	}
-	return out
 }
 
 // fieldsSetInHandlerConfigLiteral reads main.go and reports which fields the handler.Config

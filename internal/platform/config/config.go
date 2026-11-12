@@ -265,36 +265,6 @@ type Settings struct {
 	AWSRegion       string
 	NotifyEmailFrom string
 
-	// DiscordDigestWebhookURL is the incoming-webhook URL cmd/social-digest posts the
-	// daily "most viewed" list to. Optional and silently disabling, like the rest of
-	// this worker fleet: an unset value means the channel is not configured, not that
-	// the run failed. A webhook URL is itself the credential and does not expire,
-	// which is why this channel needs nothing else here.
-	//
-	// Unrelated to the five values below despite the shared name. This one posts INTO a
-	// public channel and holds no bot; those authenticate a bot that manages a role.
-	// Neither may switch the other on.
-	DiscordDigestWebhookURL string
-
-	// The daily digest's LinkedIn channel: the application that posts to our own company
-	// page, and the page it posts to.
-	//
-	// Optional as a SET, like the Discord bot below: the credentials mint a token, the
-	// organization names where it goes, and a deployment holding some of them has not
-	// configured the channel — see LinkedInDigestConfigured. What is NOT here is the access
-	// token itself, and that absence is the design: it expires every 60 days and is renewed
-	// by a worker, so it lives in social_tokens where a process can write it, not in a file
-	// only a person can edit.
-	//
-	// LinkedInRedirectURI must be one of the redirect URLs registered on the LinkedIn
-	// application and must be absolute HTTPS — LinkedIn refuses http, including on
-	// localhost, which is why the sign-in flow hands a code to a command rather than
-	// catching it on a loopback listener.
-	LinkedInClientID       string
-	LinkedInClientSecret   string
-	LinkedInRedirectURI    string
-	LinkedInOrganizationID string
-
 	// Discord paid channels (internal/engage/discordlink): the bot that keeps the paid
 	// role on the community server in step with the subscription, and the OAuth app a
 	// user links their Discord account through.
@@ -314,12 +284,6 @@ type Settings struct {
 	DiscordBotToken     string
 	DiscordGuildID      string
 	DiscordPaidRoleID   string
-
-	// OnboardingReplyTo is the human inbox that answers the founder signup sequence
-	// (internal/engage/onboarding). Those mails ask a question, so an unset value disables
-	// the sequence rather than sending letters whose replies reach nobody — the send
-	// address is a no-reply feeding the application-mail parser.
-	OnboardingReplyTo string
 
 	// ServedHosts are the exact hostnames this deployment answers on (e.g.
 	// "freehire.me,apply.freehire.me"). Only these are honoured as an OAuth redirect
@@ -508,20 +472,11 @@ func Load() Settings {
 		AWSRegion:       os.Getenv("AWS_REGION"),
 		NotifyEmailFrom: os.Getenv("NOTIFY_EMAIL_FROM"),
 
-		DiscordDigestWebhookURL: os.Getenv("DISCORD_DIGEST_WEBHOOK_URL"),
-
-		LinkedInClientID:       os.Getenv("LINKEDIN_CLIENT_ID"),
-		LinkedInClientSecret:   os.Getenv("LINKEDIN_CLIENT_SECRET"),
-		LinkedInRedirectURI:    os.Getenv("LINKEDIN_REDIRECT_URI"),
-		LinkedInOrganizationID: os.Getenv("LINKEDIN_ORGANIZATION_ID"),
-
 		DiscordClientID:     os.Getenv("DISCORD_CLIENT_ID"),
 		DiscordClientSecret: os.Getenv("DISCORD_CLIENT_SECRET"),
 		DiscordBotToken:     os.Getenv("DISCORD_BOT_TOKEN"),
 		DiscordGuildID:      os.Getenv("DISCORD_GUILD_ID"),
 		DiscordPaidRoleID:   os.Getenv("DISCORD_PAID_ROLE_ID"),
-
-		OnboardingReplyTo: os.Getenv("ONBOARDING_REPLY_TO"),
 
 		ServedHosts:                splitCSV(os.Getenv("SERVED_HOSTS")),
 		TracerLinkSalt:             os.Getenv("TRACER_LINK_SALT"),
@@ -535,6 +490,21 @@ func Load() Settings {
 
 // StrictAnonLimits reports PUBLIC_ANON_LIMITS=strict, the one value besides empty it accepts.
 func (s Settings) StrictAnonLimits() bool { return s.PublicAnonLimits == "strict" }
+
+// ValidateJobSearcher checks settings used by the public catalogue server without
+// requiring credentials for account, AI, or recruiting features.
+func (s Settings) ValidateJobSearcher() error {
+	if s.DatabaseURL == "" {
+		return errors.New("DATABASE_URL is required")
+	}
+	if s.Port == "" {
+		return errors.New("PORT is required")
+	}
+	if s.PublicAnonLimits != "" && !s.StrictAnonLimits() {
+		return fmt.Errorf("PUBLIC_ANON_LIMITS must be empty or \"strict\", got %q", s.PublicAnonLimits)
+	}
+	return nil
+}
 
 // Validate checks that the configuration values are safe to boot the auth surface with.
 // The JWT secret check runs in every environment, not just production: HS256 security

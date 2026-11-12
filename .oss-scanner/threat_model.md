@@ -17,8 +17,10 @@ Untrusted input enters in three places:
 - **Crawled third-party content.** The ingest workers (`cmd/ingest`, `cmd/tg-ingest`, `internal/ingest/...`)
   fetch hundreds of job boards and Telegram channels. Assume every posting is attacker-authored: titles,
   descriptions (HTML), company names, URLs and the links inside them.
-- **User uploads and mail.** CV files (PDF, parsed with `pdftotext`, rendered with typst), inbound email
-  (`cmd/mail-ingest`, Gmail sync) and OAuth callbacks.
+- **User uploads.** CV files (PDF, parsed with `pdftotext`, rendered with typst). The mail
+  and OAuth ingest surfaces (`cmd/mail-ingest`, Gmail sync) were removed with the Job
+  Searcher adaptation; the packages behind them remain in the tree, so treat their stored
+  data as still present even though nothing new is written.
 
 ## Components that matter most / least
 

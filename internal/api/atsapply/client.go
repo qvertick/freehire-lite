@@ -176,16 +176,6 @@ func (c *Client) WithBrowserUse(executor *BrowserUseExecutor) *Client {
 	return c
 }
 
-// WithStoredFormReader attaches the stored-form fallback fetchSchema reads before giving
-// up on a provider with no live fetcher, returning c for chaining — the same
-// "optional dependency via a setter, not a NewClient parameter" shape WithBrowserUse
-// already established, for the same reason: this never touches NewClient's existing
-// positional signature or any of its other call sites.
-func (c *Client) WithStoredFormReader(forms StoredFormReader) *Client {
-	c.forms = forms
-	return c
-}
-
 // CVReader resolves one owned CV record for rendering. *cv.Store satisfies it directly;
 // tests use a fake.
 type CVReader interface {

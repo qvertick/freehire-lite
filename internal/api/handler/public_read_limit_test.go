@@ -260,7 +260,22 @@ func publicReadRoutes(t *testing.T, throttler ratelimit.Throttler) (map[string]*
 				&mcpappHandlers{origin: testMCPOrigin},
 			)
 		}),
+		// The lite entrypoint cmd/server boots. It takes the whole *fiber.App and a Config
+		// rather than a router and a middleware bundle, so it mounts through the helper
+		// below instead of the closure above.
+		"RegisterJobSearcher": mountJobSearcher(throttler),
 	}, iss
+}
+
+// mountJobSearcher drives RegisterJobSearcher, the whole-app entrypoint that builds its
+// own middleware bundle from Config. The throttler is the only thing it needs to see
+// here: every budgeted route answers 429 before reaching a handler, so the zero-valued
+// queries and services behind it are never touched.
+func mountJobSearcher(throttler ratelimit.Throttler) *fiber.App {
+	app := fiber.New(fiber.Config{ProxyHeader: fiber.HeaderXForwardedFor})
+	app.Use(recover.New())
+	RegisterJobSearcher(app, Config{Throttler: throttler})
+	return app
 }
 
 // publicReadLimiterFuncs are the constructors whose use makes a register this guard's
@@ -368,6 +383,12 @@ func receiverTypeName(expr ast.Expr) string {
 	return "?"
 }
 
+// unbudgetedJobSearcherRoutes are the GETs RegisterJobSearcher mounts with no public-read
+// limiter, so there is no key for the driver below to check. /health is the liveness probe
+// every orchestrator polls, and /stats/catalog carries no limiter in statsHandlers.register
+// either — this entrypoint calls CatalogScale directly rather than widening it.
+var unbudgetedJobSearcherRoutes = []string{"/health", "/api/v1/stats/catalog"}
+
 // TestPublicReadLimiters_KeyWhatTheMountedChainCanSee drives the real registrations,
 // which is the whole point: the key function was correct in isolation and wrong in
 // place, and the isolated tests could not tell — they mount the limiter on a bare app,
@@ -416,6 +437,9 @@ func TestPublicReadLimiters_KeyWhatTheMountedChainCanSee(t *testing.T) {
 	for feature, app := range apps {
 		for _, route := range app.GetRoutes(true) {
 			if route.Method != fiber.MethodGet {
+				continue
+			}
+			if feature == "RegisterJobSearcher" && slices.Contains(unbudgetedJobSearcherRoutes, route.Path) {
 				continue
 			}
 			path := route.Path

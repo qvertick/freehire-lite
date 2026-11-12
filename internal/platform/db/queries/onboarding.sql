@@ -1,6 +1,9 @@
--- Candidate readers for the founder signup sequence (internal/engage/onboarding).
+-- Candidate readers for the founder signup sequence. The `internal/engage/onboarding`
+-- package that drove them was removed with the Job Searcher adaptation, so the two
+-- statements that remain are read only by the SQL-level tests beside them; the rules
+-- below are why they are worth keeping in that role.
 --
--- Three rules hold across all of them, and each is load-bearing:
+-- Three rules hold across both of them, and each is load-bearing:
 --
 --   * `email_verified` — an unverified address is one nobody proved they own.
 --     Mailing it is how a sending domain collects bounces and spam complaints for
@@ -30,116 +33,6 @@ WHERE u.email_verified
   AND NOT EXISTS (
       SELECT 1 FROM onboarding_emails oe
       WHERE oe.user_id = u.id AND oe.step = 'welcome'
-  )
-ORDER BY u.created_at
-LIMIT sqlc.arg(max_rows)::int;
-
--- name: ListAdvancedSearchCandidates :many
--- Greeted a while ago: an introduction to the filter panel (role, region, skills,
--- and how to exclude a value). Sent to everyone regardless of alert status, unlike
--- no_alert below — this is background on a feature, not a nudge toward one missing
--- action, so it asks nothing of the reader that would make it conditional.
-SELECT u.id, u.email
-FROM users u
-JOIN onboarding_emails w ON w.user_id = u.id AND w.step = 'welcome'
-LEFT JOIN notification_settings ns ON ns.user_id = u.id
-WHERE u.email_verified
-  AND u.created_at > now() - make_interval(days => sqlc.arg(window_days)::int)
-  AND w.sent_at < now() - make_interval(days => sqlc.arg(after_days)::int)
-  AND COALESCE(ns.news_email_enabled, true)
-  AND NOT EXISTS (
-      SELECT 1 FROM onboarding_emails oe
-      WHERE oe.user_id = u.id AND oe.step = 'advanced_search'
-  )
-ORDER BY u.created_at
-LIMIT sqlc.arg(max_rows)::int;
-
--- name: ListNoAlertCandidates :many
--- Greeted a while ago, and still without an active alert — the one action the
--- product is built around.
---
--- The wait is measured from the greeting (w.sent_at), not from signup. Measuring it
--- from signup breaks on the very first run: every account older than the delay is
--- instantly eligible for both steps, so the same person gets "hi, I'm Ilya" and then
--- "you signed up a few days ago and still have no alert" an hour apart. From two
--- mails in an hour, a stranger is indistinguishable from a spammer.
-SELECT u.id, u.email
-FROM users u
-JOIN onboarding_emails w ON w.user_id = u.id AND w.step = 'welcome'
-LEFT JOIN notification_settings ns ON ns.user_id = u.id
-WHERE u.email_verified
-  AND u.created_at > now() - make_interval(days => sqlc.arg(window_days)::int)
-  AND w.sent_at < now() - make_interval(days => sqlc.arg(after_days)::int)
-  AND COALESCE(ns.news_email_enabled, true)
-  AND NOT EXISTS (
-      SELECT 1 FROM subscriptions s WHERE s.user_id = u.id AND s.active
-  )
-  AND NOT EXISTS (
-      SELECT 1 FROM onboarding_emails oe
-      WHERE oe.user_id = u.id AND oe.step = 'no_alert'
-  )
-ORDER BY u.created_at
-LIMIT sqlc.arg(max_rows)::int;
-
--- name: ListExtensionCandidates :many
--- Greeted a while ago: an introduction to the browser extension. Unconditional like
--- advanced_search above, and for a stricter reason — nothing here records whether an
--- account has already installed it, so "only those without it" is not a query this
--- schema can answer.
-SELECT u.id, u.email
-FROM users u
-JOIN onboarding_emails w ON w.user_id = u.id AND w.step = 'welcome'
-LEFT JOIN notification_settings ns ON ns.user_id = u.id
-WHERE u.email_verified
-  AND u.created_at > now() - make_interval(days => sqlc.arg(window_days)::int)
-  AND w.sent_at < now() - make_interval(days => sqlc.arg(after_days)::int)
-  AND COALESCE(ns.news_email_enabled, true)
-  AND NOT EXISTS (
-      SELECT 1 FROM onboarding_emails oe
-      WHERE oe.user_id = u.id AND oe.step = 'extension'
-  )
-ORDER BY u.created_at
-LIMIT sqlc.arg(max_rows)::int;
-
--- name: ListOpenSourceCandidates :many
--- Everyone greeted and past the wait, whether or not they set up an alert: this
--- step asks for a star and a Discord visit, which is worth asking of a browser as
--- much as of a regular.
---
--- The wait runs from the greeting, for the same reason it does above: paced from
--- signup, a two-week-old account would receive the whole sequence in one afternoon.
-SELECT u.id, u.email
-FROM users u
-JOIN onboarding_emails w ON w.user_id = u.id AND w.step = 'welcome'
-LEFT JOIN notification_settings ns ON ns.user_id = u.id
-WHERE u.email_verified
-  AND u.created_at > now() - make_interval(days => sqlc.arg(window_days)::int)
-  AND w.sent_at < now() - make_interval(days => sqlc.arg(after_days)::int)
-  AND COALESCE(ns.news_email_enabled, true)
-  AND NOT EXISTS (
-      SELECT 1 FROM onboarding_emails oe
-      WHERE oe.user_id = u.id AND oe.step = 'open_source'
-  )
-ORDER BY u.created_at
-LIMIT sqlc.arg(max_rows)::int;
-
--- name: ListTailorCandidates :many
--- Greeted a while ago and not paying: an introduction to CV tailoring, which is a
--- Pro feature. An account with a live Pro or Ultra tier already has it, and a letter
--- selling it what it bought reads as nobody looking. pro_until/ultra_until rather than
--- the per-provider sources, for the reason ListProWelcomeCandidates gives.
-SELECT u.id, u.email
-FROM users u
-JOIN onboarding_emails w ON w.user_id = u.id AND w.step = 'welcome'
-LEFT JOIN notification_settings ns ON ns.user_id = u.id
-WHERE u.email_verified
-  AND u.created_at > now() - make_interval(days => sqlc.arg(window_days)::int)
-  AND w.sent_at < now() - make_interval(days => sqlc.arg(after_days)::int)
-  AND COALESCE(ns.news_email_enabled, true)
-  AND NOT (COALESCE(u.pro_until > now(), false) OR COALESCE(u.ultra_until > now(), false))
-  AND NOT EXISTS (
-      SELECT 1 FROM onboarding_emails oe
-      WHERE oe.user_id = u.id AND oe.step = 'tailor'
   )
 ORDER BY u.created_at
 LIMIT sqlc.arg(max_rows)::int;

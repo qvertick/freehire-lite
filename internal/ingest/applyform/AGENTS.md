@@ -77,10 +77,12 @@ on the job page. Providers: greenhouse, ashby, workable, lever, dover. Queue dra
 
 ## How it works
 `cmd/ingest` enqueues a capture when `applyform.NeedsRequestCapture(source)`
-(`cmd/ingest/store.go:266`). `cmd/capture-apply-form` runs `applyform.Run`, which delegates
-the claim/process loop to `internal/platform/outbox.RunPool` (runner.go:115-133): claim a leased
-wave, fetch each posting's form through its provider fetcher, and `Save` — which stores the
-form and retires the queue entry atomically, so a capture cannot be both stored and left
-queued. Tunables: `APPLY_FORM_BATCH_SIZE` (200), `_LEASE_SECONDS` (300, floored to the call
-timeout so an in-flight capture is never re-claimed), `_MAX_ATTEMPTS` (3), `_CONCURRENCY`
-(4), `_MAX_PER_RUN` (5000), `_CALL_TIMEOUT_SECONDS` (20) — internal/platform/config/applyform.go:29-53.
+(`cmd/ingest/store.go:266`). `cmd/capture-apply-form` used to run `applyform.Run`, which
+delegates the claim/process loop to `internal/platform/outbox.RunPool` (runner.go:115-133):
+claim a leased wave, fetch each posting's form through its provider fetcher, and `Save` —
+which stores the form and retires the queue entry atomically, so a capture cannot be both
+stored and left queued. That binary was removed with the Job Searcher adaptation, and the
+`config.LoadApplyForm` loader that fed it went with it; the tunables it read were
+`APPLY_FORM_BATCH_SIZE` (200), `_LEASE_SECONDS` (300, floored to the call timeout so an
+in-flight capture is never re-claimed), `_MAX_ATTEMPTS` (3), `_CONCURRENCY` (4),
+`_MAX_PER_RUN` (5000) and `_CALL_TIMEOUT_SECONDS` (20).

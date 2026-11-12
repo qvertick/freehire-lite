@@ -32,23 +32,11 @@ type StoredFormReader interface {
 // keeping a browser open past the scan it needs for Greenhouse.
 //
 // A separate type from Client rather than another method on it: Client is wired for
-// cmd/auto-apply's own submission dependencies (LLM drafting, CV rendering) that Preview
-// never touches, and its one caller (cmd/auto-apply's own new preview pass) constructs it
-// independently for exactly that reason.
+// the submission dependencies (LLM drafting, CV rendering) Preview never touches.
 type PreviewClient struct {
 	fetchers      map[string]applyform.Fetcher
 	forms         StoredFormReader
 	allocatorOpts []chromedp.ExecAllocatorOption
-}
-
-// NewPreviewClient builds a PreviewClient. forms may be nil, degrading every provider to a
-// live schema fetch (fine, just one more request than necessary).
-func NewPreviewClient(transport applyform.Transport, forms StoredFormReader) *PreviewClient {
-	return &PreviewClient{
-		fetchers:      applyform.Fetchers(transport),
-		forms:         forms,
-		allocatorOpts: stealthAllocatorOptions(),
-	}
 }
 
 // Preview resolves what an unattended submission of claimed would currently send, without

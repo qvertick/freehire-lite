@@ -5,7 +5,10 @@ Drives a headless Chrome (`chromedp`) against one job's live application-form pa
 rendered DOM, reconcile it against the platform's own declared schema
 (`internal/ingest/applyform.Form`, reused — not re-fetched), resolve the merged fields against a
 candidate's known answers, and fill + submit only when every required question is answered.
-Implements `internal/application/autoapply.SidecarClient` — the one caller is `cmd/auto-apply`.
+Implements `internal/application/autoapply.SidecarClient`. **No binary constructs it any more**:
+`cmd/auto-apply` was removed with the Job Searcher adaptation, so the package is compiled and
+unit-tested but has no production caller. Read the invariants below as the rules that would
+bind it if it is wired again, not as a description of a live path.
 
 **This package is chromedp, in-process — not a Python/Patchright sidecar.** The OpenSpec
 change this package belongs to originally proposed one; a follow-up spike found chromedp + a
@@ -106,8 +109,10 @@ process, called only via `Client.WithBrowserUse`. Scope is deliberately narrow:
 - **`fetchSchema` falls back to a stored form ONLY when no live fetcher is registered for
   the provider, or the live fetch FAILED — never storage-first.** The failure case was added
   on 2026-10-25, when Workable rate-limited this host for 23 hours and every approved
-  application died on the schema fetch before the browser ever ran. `Client.forms` (`WithStoredFormReader`, same
-  `StoredFormReader` port `PreviewClient` uses) closes Recruitee's own schema-fetch gap:
+  application died on the schema fetch before the browser ever ran. `Client.forms` (the same
+  `StoredFormReader` port `PreviewClient` uses; the setter that used to wire it and the worker
+  that supplied it are both gone with the Job Searcher adaptation, so only tests set it now)
+  closes Recruitee's own schema-fetch gap:
   `internal/ingest/applyform.Fetchers` has no `Fetcher` for it (its form arrives free with
   the ingest crawl and is written directly to `apply_forms`), so before this it parked with
   `errNoSchemaFetcher` before `resolve` ever ran. This does NOT mirror

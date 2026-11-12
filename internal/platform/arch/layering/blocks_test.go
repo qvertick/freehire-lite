@@ -99,7 +99,6 @@ func TestPlacementsThatContradictTheirNameArePinned(t *testing.T) {
 		"jobreality":    "job",       // same
 		"liveness":      "job",       // same
 		"matchanalysis": "candidate", // reaches resumeextract, jobmatch, hardconstraint
-		"mailpreview":   "engage",    // imports eight engage packages
 		"facetsnapshot": "search",    // wraps search
 		"searchintent":  "search",    // same
 		"submission":    "ingest",    // manual job intake, not an application

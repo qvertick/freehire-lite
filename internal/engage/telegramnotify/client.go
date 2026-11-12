@@ -57,15 +57,6 @@ func (c *Client) SendMessage(ctx context.Context, chatID int64, html string) err
 	})
 }
 
-// SetWebhook registers the inbound webhook URL and its secret token (sent by
-// Telegram in the X-Telegram-Bot-Api-Secret-Token header on every update).
-func (c *Client) SetWebhook(ctx context.Context, url, secret string) error {
-	return c.call(ctx, "setWebhook", map[string]any{
-		"url":          url,
-		"secret_token": secret,
-	})
-}
-
 // apiResponse is the envelope every Bot API method returns.
 type apiResponse struct {
 	OK          bool   `json:"ok"`

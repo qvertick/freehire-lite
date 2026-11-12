@@ -62,6 +62,10 @@ type Client struct {
 	baseURL string
 }
 
+// The client is the concrete Discord the service is wired to; asserted here so a signature
+// that drifts fails at build time in this package rather than at the composition root.
+var _ Discord = (*Client)(nil)
+
 // NewClient builds a client for one Discord application and one guild.
 //
 // A plain http.Client rather than safehttp, for the reason internal/engage/socialdigest

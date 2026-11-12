@@ -23,15 +23,19 @@ across the worker and the link path.
 | `discordlink.go` | The decision, with no I/O: who warrants the role, and what reconciliation owes one binding (`Reconcile` → `ActionNone`/`Grant`/`Revoke`). |
 | `client.go` | Discord's REST API: token exchange, `/users/@me`, join guild, grant/revoke role. |
 | `service.go` | The use cases — link, unlink, `Sync`. |
-| `repository.go` | The sqlc-backed store. |
 
 There is **no bot process**. Everything Discord needs from us is a request/response, so this
-runs inside an HTTP handler (linking) and `cmd/discord-sync` (reconciliation, hourly). Nothing
-holds a gateway connection or reads a message.
+runs inside an HTTP handler (linking). Nothing holds a gateway connection or reads a message.
+
+**The Postgres store and the hourly reconciler are gone with the Job Searcher adaptation.**
+`repository.go` and `cmd/discord-sync` were removed, so nothing in production constructs the
+`Service`: the routes exist, but the linker behind them is the handler's own interface
+(`internal/api/handler/discord.go`) and its tests' fake. What remains here is the decision
+(`discordlink.go`) and the client, kept because the handler's types and error values come from
+this package.
 
 A plain `http.Client`, not `internal/platform/safehttp`: the host is a fixed vendor endpoint
-from operator configuration, not user input — the same reasoning
-[socialdigest](../socialdigest/AGENTS.md) gives for the digest webhook.
+from operator configuration, not user input.
 
 ## Traps
 
@@ -66,9 +70,6 @@ Five values, all load-bearing: `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`,
 `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_PAID_ROLE_ID`. Any one missing means the
 feature is off — `config.Settings.DiscordPaidAccessConfigured` is the single decider, so the
 routes (which 404 by not being mounted), the SPA card and the worker cannot disagree.
-
-`DISCORD_DIGEST_WEBHOOK_URL` is a different Discord integration with a different credential.
-Neither switches the other on.
 
 ## What is done by hand
 

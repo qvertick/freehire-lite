@@ -1,4 +1,6 @@
--- Audience reader and ledger writer for one-off campaigns (internal/engage/broadcast).
+-- Audience reader for one-off campaigns. The broadcast writer
+-- (internal/engage/broadcast) was removed with the Job Searcher adaptation, so this
+-- statement is now read only by the SQL-level tests beside it.
 
 -- name: ListBroadcastCandidates :many
 -- Everyone who can be mailed and has not received this campaign yet.
@@ -30,22 +32,3 @@ WHERE u.email_verified
   )
 ORDER BY u.created_at
 LIMIT sqlc.arg(max_rows)::int;
-
--- name: CountBroadcastCandidates :one
--- How many people a campaign would reach right now. Read before sending: a campaign
--- is irreversible and goes to everyone, so the number is worth seeing first.
-SELECT count(*)
-FROM users u
-LEFT JOIN notification_settings ns ON ns.user_id = u.id
-WHERE u.email_verified
-  AND COALESCE(ns.news_email_enabled, true)
-  AND NOT EXISTS (
-      SELECT 1 FROM broadcast_emails be
-      WHERE be.user_id = u.id AND be.campaign = sqlc.arg(campaign)
-  );
-
--- name: RecordBroadcastEmail :exec
--- Closes out one (user, campaign) whether or not the send worked.
-INSERT INTO broadcast_emails (user_id, campaign, error)
-VALUES (sqlc.arg(user_id), sqlc.arg(campaign), sqlc.arg(error))
-ON CONFLICT (user_id, campaign) DO NOTHING;

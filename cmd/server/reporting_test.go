@@ -27,14 +27,16 @@ func TestRunMainReportsStartupFailure(t *testing.T) {
 	}))
 	defer server.Close()
 	t.Setenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", server.URL+"/v1/logs")
-	t.Setenv("JWT_SECRET", "")
+	// An invalid PUBLIC_ANON_LIMITS fails ValidateJobSearcher before any pool is opened,
+	// so the refusal path is exercised without a database.
+	t.Setenv("PUBLIC_ANON_LIMITS", "bogus")
 	if code := runMain(); code != 1 {
 		t.Fatalf("exit=%d, want 1", code)
 	}
 	select {
 	case request := <-requests:
 		records := request.ResourceLogs[0].ScopeLogs[0].LogRecords
-		if len(records) != 1 || !strings.Contains(records[0].Body.GetStringValue(), "JWT_SECRET") {
+		if len(records) != 1 || !strings.Contains(records[0].Body.GetStringValue(), "PUBLIC_ANON_LIMITS") {
 			t.Fatalf("missing startup failure: %v", records)
 		}
 	case <-time.After(3 * time.Second):

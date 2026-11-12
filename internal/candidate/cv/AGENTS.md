@@ -36,9 +36,10 @@ generation.
    is absolute — printing the raw value as the target yields a relative URI no reader can follow.
    `TestEveryTemplateRendersLinksAsClickableLinks` walks the registry, so a new template is held to
    this without the test being edited.
-5. Run `make cv-previews` to regenerate `web/static/cv-previews/<id>.svg` (the gallery
-   thumbnails). A preview is committed for every registered id — the generator iterates the
-   registry so the set can't drift.
+5. Regenerate `web/static/cv-previews/<id>.svg` (the gallery thumbnails) with
+   `GeneratePreviews`; the `cmd/cv-previews` dev binary that drove it was removed with the
+   Job Searcher adaptation. A preview is committed for every registered id — the generator
+   iterates the registry so the set can't drift.
 
 Two Typst traps that cost real debugging time here:
 
