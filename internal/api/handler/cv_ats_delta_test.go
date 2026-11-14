@@ -161,9 +161,7 @@ func TestScoreRenderedCV_AFieldTheTemplateDropsDoesNotScore(t *testing.T) {
 	if err != nil {
 		t.Skip("typst not installed; skipping rendered-artifact scoring")
 	}
-	if _, err := exec.LookPath("pdftotext"); err != nil {
-		t.Skip("pdftotext not installed; skipping rendered-artifact scoring")
-	}
+	requirePDFTool(t)
 	h := &cvHandlers{cvRenderer: cv.NewTypstRenderer(bin), extractPDFText: resume.ExtractPDFText}
 
 	// Kubernetes appears in the certification and nowhere else in the document.
@@ -246,9 +244,7 @@ func TestScoreRenderedCV_RealToolchainDelta(t *testing.T) {
 	if err != nil {
 		t.Skip("typst not installed; skipping real-toolchain delta")
 	}
-	if _, err := exec.LookPath("pdftotext"); err != nil {
-		t.Skip("pdftotext not installed; skipping real-toolchain delta")
-	}
+	requirePDFTool(t)
 	h := &cvHandlers{cvRenderer: cv.NewTypstRenderer(bin), extractPDFText: resume.ExtractPDFText}
 	tmpl, err := cv.ResolveTemplate("classic-ats")
 	if err != nil {

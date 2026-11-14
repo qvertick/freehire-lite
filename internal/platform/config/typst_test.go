@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"runtime"
+	"testing"
+)
 
 func TestResolveTypstBin(t *testing.T) {
 	if got := resolveTypstBin(""); got != "" {
@@ -9,8 +12,14 @@ func TestResolveTypstBin(t *testing.T) {
 	if got := resolveTypstBin("definitely-not-a-real-binary-xyz-123"); got != "" {
 		t.Errorf("missing binary should resolve to empty (disables rendering), got %q", got)
 	}
-	// "sh" is present on every unix runner; a resolvable name yields an absolute path.
-	if got := resolveTypstBin("sh"); got == "" {
-		t.Error("an on-PATH binary should resolve to a non-empty path")
+	// A binary that is present on every runner: "sh" on unix, "cmd" on Windows
+	// (LookPath only finds an executable by its PATHEXT extension there). A
+	// resolvable name yields an absolute path.
+	onPath := "sh"
+	if runtime.GOOS == "windows" {
+		onPath = "cmd"
+	}
+	if got := resolveTypstBin(onPath); got == "" {
+		t.Errorf("an on-PATH binary should resolve to a non-empty path (looked for %q)", onPath)
 	}
 }

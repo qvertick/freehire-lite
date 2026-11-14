@@ -102,7 +102,7 @@ var blocks = map[string][]string{
 		"speech",
 	},
 	"identity": {
-		"accountdelete", "accounts", "auth", "auth/apple", "auth/applejobs",
+		"accountdelete", "accounts", "auth", "auth/apple",
 		"auth/mobileauth", "auth/oauth", "auth/oauth2server", "auth/recentauth",
 		// billing is here and not in ai, where plan lives, because a subscription is an
 		// attribute of the ACCOUNT. The constraint that pushed plan out of this block —
@@ -204,9 +204,9 @@ var blocks = map[string][]string{
 		"wikicompany",
 	},
 	"application": {
-		"agentview", "appevent", "apptimeline", "autoapply", "autoapplyorchestrate", "calmatch", "calsync",
+		"agentview", "appevent", "apptimeline", "autoapply", "autoapplyorchestrate",
 		"deliverywindow", "followup", "gmailsync", "ical", "inbox", "jobtracking",
-		"mailbox", "mailclassify", "mailingest", "maillink", "mailmatch", "mailrecall", "mailtpl",
+		"mailbox", "mailclassify", "maillink", "mailmatch", "mailrecall", "mailtpl",
 		"userjob", "viewlog",
 	},
 	"search": {
@@ -225,49 +225,28 @@ var blocks = map[string][]string{
 		"linksource", "moderation", "pipeline", "rederive", "screeninganswers", "sources", "sourcestats",
 		"submission", "sweep", "telegram",
 	},
-	// socialdigest is here and not in ingest because it is outbound engagement — the
-	// same shape as broadcast and notify, differing only in that its audience is the
-	// public rather than an account. It reads the catalogue (job) and the view rollup
-	// (application), both below it.
 	// discordlink is here rather than beside billing for the same reason: what it does is
 	// outbound engagement (a role on a community server), and it reaches identity/billing
 	// only to ask which tier an account holds. Placing it in identity would invert that —
 	// billing would import a community integration — and the guard would say so.
 	"engage": {
-		"broadcast", "buddy", "community", "companyfeedback", "discordlink", "emailnotify", "emailprefs",
-		// limitnudge is outbound engagement like prowelcome below, and needs even less
-		// reach than it: the trigger (a free-tier plan-ceiling refusal) is written by
-		// internal/ai/plan.Store directly into plan_limit_hits, so this package never
-		// imports ai/plan at all — only its own candidate query over that table and users.
-		"limitnudge",
-		"linkedinauth", "mailpreview", "mentorship", "messaging",
-		// mentorship/busysync is named in full, per the auth/oauth convention: it is a
-		// sub-package of mentorship and takes its parent's block, but the sync worker
-		// reaches into application (gmailsync) the way mentorship itself does for the
-		// calendar-write consent, so it is listed rather than left implicit.
-		"mentorship/busysync",
-		"notify", "nudge", "onboarding",
+		"buddy", "community", "companyfeedback", "discordlink", "emailnotify", "emailprefs",
+		"mentorship", "messaging", "notify",
 		// ga4mp sends one sign-up event to Google Analytics from the server. It imports
 		// nothing but the standard library and is called by the auth handlers; it sits in
-		// engage because the event is a growth measurement, like prowelcome and referral.
+		// engage because the event is a growth measurement, like referral.
 		"ga4mp",
 		// processreport holds candidate-reported facts about how a company hires (today:
 		// that it screens with an AI interviewer). It sits beside companyfeedback and not
 		// in job, because what it stores is what a PERSON reported, not a property the
 		// catalogue derived — the same reason report and vote are here.
 		"processreport", "pushnotify",
-		// prowelcome is here rather than beside billing for the same reason discordlink
-		// is: it is outbound engagement (a one-time email), not subscription logic. It
-		// reads a tier resolved elsewhere (plan.TierOf, same as discordlink) and never
-		// imports identity/billing at all — the reconciling worker that calls it reads
-		// the entitlement columns directly.
-		"prowelcome",
 		"referral", "reminder", "report",
 		// slots is the pure availability engine (rules, expansion, slicing) that mentorship
 		// and buddy mock interviews both compute with. It imports nothing but the standard
 		// library; it sits in engage because both of its callers do.
 		"slots",
-		"socialdigest", "subscription",
+		"subscription",
 		"telegramnotify", "vote", "webhooknotify",
 	},
 	// atsapply and candidateprofile sit here, not lower, because both need to reach

@@ -1,0 +1,118 @@
+# Windows local development stack — backing services only.
+#
+# The Go API (cmd/server) and the SvelteKit dev server (web/) run NATIVELY on
+# Windows, so this file deliberately starts ONLY the three backing services and
+# never builds the `app` / `web` images from DockerCompose.yml. It exists because
+# the main compose file publishes neither Redis nor the database to the host:
+# inside that stack both are reachable only over the compose network by service
+# name, which a natively-running Windows binary cannot use.
+#
+# Usage (from WSL, where the Docker engine lives):
+#   cd /mnt/c/Users/<you>/OneDrive/Pulpit/freehire-lite
+#   docker compose -f DockerCompose.windows.yml up -d
+#
+# Postgres applies ./migrations automatically on first volume init, exactly like
+# the main compose stack. The volume is project-scoped, so this stack has its own
+# database and does not share one with DockerCompose.yml.
+#
+# The Go API reaches these services on localhost:<port> — WSL2 forwards the
+# published ports to the Windows host.
+services:
+  db:
+    # pgvector's build, not stock postgres: migration 0092 runs
+    # `CREATE EXTENSION vector`, which the stock image doesn't ship.
+    image: pgvector/pgvector:pg18
+    # WSL shuts the distro down when the last session exits, which stops dockerd
+    # and takes every container with it. This policy brings them back the moment
+    # the engine is running again — the keepalive session only has to keep WSL
+    # alive, not restart the stack by hand.
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hire
+      POSTGRES_PASSWORD: hire
+      POSTGRES_DB: hire
+    ports:
+      - "5432:5432"
+    volumes:
+      # postgres:18+ stores data in a version-specific subdirectory and expects
+      # the volume at /var/lib/postgresql (not the legacy .../data path).
+      - pgdata:/var/lib/postgresql
+      # Migrations are applied automatically by Postgres on first volume init.
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hire -d hire"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # Search backend for GET /api/v1/jobs/search and the reindex command.
+  meilisearch:
+    image: getmeili/meilisearch:v1.49.0
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: "${MEILI_MASTER_KEY:-dev-insecure-meili-key}"
+      MEILI_ENV: development
+    ports:
+      - "7700:7700"
+    volumes:
+      - meilisearch_data:/meili_data
+    # `meili-init` below waits for this, and the API on Windows reaches health
+    # through the forwarded port anyway.
+    healthcheck:
+      test: ["CMD", "/usr/bin/curl", "-fsS", "http://127.0.0.1:7700/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+
+  # Backs the shared rate limiter (internal/api/ratelimit). Counters are
+  # ephemeral/TTL'd, so losing them on restart is a fail-open no-op.
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # Enables `editDocumentsByFunction`, the one experimental feature the index
+  # needs: cmd/search-drain's duplicate-marker and closure passes call
+  # POST /indexes/jobs/documents/edit (internal/search), and without the feature
+  # that pass fails while the rest of the wave succeeds — leaving the outbox wave
+  # claimed for lease-expiry retry.
+  #
+  # There is no startup switch in Meilisearch v1.49: the flag is absent from
+  # `--help`, no MEILI_EXPERIMENTAL_* variable exists for it (checked against the
+  # running binary), and `--config-file-path` accepts TOML whose schema rejects
+  # an `experimental_features` table. Only the runtime PATCH below turns it on.
+  # That also means it does NOT survive a Meilisearch restart, which is why this
+  # is a service rather than a one-time curl: `up -d` re-runs an exited one-shot
+  # container every time the stack starts.
+  #
+  # It reuses the meilisearch image (it ships /usr/bin/curl) so the stack stays
+  # three images. `{}` is the success body; -f turns any 4xx into a failed step.
+  meili-init:
+    image: getmeili/meilisearch:v1.49.0
+    entrypoint: ["/usr/bin/curl"]
+    command:
+      - "-fsS"
+      - "-X"
+      - "PATCH"
+      - "-H"
+      - "Authorization: Bearer ${MEILI_MASTER_KEY:-dev-insecure-meili-key}"
+      - "-H"
+      - "Content-Type: application/json"
+      - "--data"
+      - '{"editDocumentsByFunction":true}'
+      - "http://meilisearch:7700/experimental-features"
+    depends_on:
+      meilisearch:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  pgdata:
+  meilisearch_data:

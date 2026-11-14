@@ -1,5 +1,10 @@
 # Hosted mailbox — ops runbook
 
+> **Not built in this repository.** The `cmd/mail-ingest` daemon named below was removed
+> with the Job Searcher adaptation, so the application code that would consume this
+> pipeline is inert whether or not the infra exists. Kept as the runbook for whoever
+> restores the drainer.
+
 The hosted mailbox is the second inbox option (beside Connect Gmail): each user
 can claim an address on our receiving domain and read mail sent there, in the same
 `/my/inbox` as their Gmail mail. The application code is inert until the AWS SES

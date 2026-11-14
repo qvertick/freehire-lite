@@ -366,9 +366,11 @@ func TestRoastCV_AnUnreadableCVIsAnAnswerNotAnError(t *testing.T) {
 }
 
 // TestRoastCV_RealPDFFromAnAnonymousCaller is the spec's headline scenario driven end to
-// end: a genuine PDF, no session, a real score. The package already ships the fixture and
-// TestExtractResumeProfile_PDF already proves pdftotext is present in this environment.
+// end: a genuine PDF, no session, a real score. It needs the poppler pdftotext the
+// résumé extractor shells out to, so requirePDFTool skips it where that is absent —
+// except under CI, where the binary is installed and its absence is a failure.
 func TestRoastCV_RealPDFFromAnAnonymousCaller(t *testing.T) {
+	requirePDFTool(t)
 	pdf, err := os.ReadFile("testdata/resume_sample.pdf")
 	if err != nil {
 		t.Fatalf("read fixture: %v", err)

@@ -4,19 +4,26 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf8"
 )
 
-// requirePDFTool skips a test when pdftotext is not on PATH, mirroring the typst-gated
-// renderer test — so `go test ./...` stays green on machines without poppler while the
-// extraction is still exercised wherever the production tool is present.
+// requirePDFTool skips a test when pdftotext is not on PATH — so `go test ./...`
+// stays green on a machine without poppler (a stock Windows host) while the
+// extraction is exercised wherever the production tool is present. Under CI it
+// fails instead: .github/workflows/ci.yml installs poppler-utils in every job
+// that runs tests, so a missing binary there means that step broke, and a skip
+// would hide the regression behind a green tick.
 func requirePDFTool(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("pdftotext"); err != nil {
-		t.Skip("pdftotext not on PATH; skipping PDF extraction test")
+		if os.Getenv("CI") != "" {
+			t.Fatalf("pdftotext not on PATH although CI is set (the poppler-utils install step in .github/workflows/ci.yml did not take effect): %v", err)
+		}
+		t.Skipf("pdftotext not on PATH (%v); install poppler-utils to run this test", err)
 	}
 }
 
@@ -25,6 +32,13 @@ func requirePDFTool(t *testing.T) {
 // Restored by t.Cleanup.
 func stubPDFTool(t *testing.T, filler string, n int) {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		// The stub is a POSIX shell script, and Windows cannot exec one: CreateProcess
+		// answers "%1 is not a valid Win32 application". There is no shell on a stock
+		// Windows host to run it through either, so the guard this exercises stays
+		// covered by the Linux CI run and by a Windows host with a POSIX shell.
+		t.Skip("windows: the stub is a POSIX shell script, which Windows cannot exec")
+	}
 	path := filepath.Join(t.TempDir(), "spew.sh")
 	script := "#!/bin/sh\nyes '" + filler + "' | head -c " + strconv.Itoa(n) + "\n"
 	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {

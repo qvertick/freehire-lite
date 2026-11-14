@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -54,6 +55,11 @@ func TestReadAssignedTreatsAMissingFileAsTheFirstRun(t *testing.T) {
 func TestReadAssignedRefusesAnUnreadableRegistry(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("running as root: permission bits do not deny reads")
+	}
+	if runtime.GOOS == "windows" {
+		// Windows has no read permission bit: a 0o000 file is still readable, so the
+		// premise of the test cannot be set up there.
+		t.Skip("windows: permission bits do not deny reads")
 	}
 	path := filepath.Join(t.TempDir(), "registry.go")
 	if err := os.WriteFile(path, []byte(sample), 0o000); err != nil {

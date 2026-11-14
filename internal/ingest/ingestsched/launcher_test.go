@@ -3,6 +3,7 @@ package ingestsched
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -311,7 +312,9 @@ func TestLaunchReadsTheProvidersOwnEnvironmentFileAfterTheSharedOne(t *testing.T
 			files = append(files, v)
 		}
 	}
-	want := []string{"/opt/freehire/.env", "-/opt/freehire/ingest-env/successfactors.env"}
+	// The path is built with filepath.Join, so the expectation is too: the separator
+	// is the platform's, and a hardcoded "/" would fail on Windows.
+	want := []string{"/opt/freehire/.env", filepath.Join("-", "/opt/freehire/ingest-env/successfactors.env")}
 	if !slices.Equal(files, want) {
 		t.Errorf("EnvironmentFile properties = %q, want %q", files, want)
 	}
@@ -329,7 +332,7 @@ func TestLaunchProviderEnvironmentFileIgnoresAnOptionalSharedFileMarker(t *testi
 	}); err != nil {
 		t.Fatalf("Launch: %v", err)
 	}
-	if !slices.Contains(rec.args, "--property=EnvironmentFile=-/opt/freehire/ingest-env/successfactors.env") {
+	if !slices.Contains(rec.args, "--property=EnvironmentFile="+filepath.Join("-", "/opt/freehire/ingest-env/successfactors.env")) {
 		t.Errorf("provider environment file not derived from the unmarked path: %q", rec.args)
 	}
 }

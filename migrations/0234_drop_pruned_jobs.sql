@@ -1,0 +1,21 @@
+-- Drop pruned_jobs (0041). The catalogue-pruning campaign it archived is retired: the
+-- board is broader than IT now, so nothing removes postings for being non-technical, and
+-- the `prune` worker that wrote this table is gone from `cmd/`.
+--
+-- Nothing reads it. No query in internal/platform/db/queries mentions the table, no Go
+-- code runs raw SQL against it, and no other table has a foreign key to it (it never had
+-- one, by design — 0041 explains why). Its only consumers were the retired campaign's
+-- own reports, which lived in the ops host's backups, not in the application.
+--
+-- On an existing database this is a deliberate discard of the pruning audit trail; take
+-- a dump first if that history is still wanted, because a DROP is the one step nothing
+-- else can undo. On a fresh deploy the table would only ever be created empty, which is
+-- the case this repository is scaled for.
+--
+-- CASCADE is deliberately NOT used: if something still depends on the table, the drop
+-- should fail and say so rather than quietly take the dependant with it.
+--
+-- The rule below fires on every DROP TABLE, because dropping one breaks existing
+-- clients. This table has no clients left; see above.
+-- squawk-ignore ban-drop-table
+DROP TABLE IF EXISTS public.pruned_jobs;

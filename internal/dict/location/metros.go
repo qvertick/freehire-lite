@@ -34,6 +34,7 @@ func loadMetros(tsv string) (map[metroKey]string, map[[2]string]string) {
 	seen := map[[2]string]string{}
 	ambiguous := map[[2]string]bool{}
 	for _, line := range strings.Split(tsv, "\n") {
+		line = strings.TrimSuffix(line, "\r") // tolerate a CRLF checkout
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}

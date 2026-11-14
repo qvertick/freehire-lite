@@ -1368,16 +1368,6 @@ type PromoRedemption struct {
 	RedeemedAt pgtype.Timestamptz `json:"redeemed_at"`
 }
 
-type PrunedJob struct {
-	ID          int64              `json:"id"`
-	Source      string             `json:"source"`
-	ExternalID  string             `json:"external_id"`
-	Title       string             `json:"title"`
-	CompanySlug string             `json:"company_slug"`
-	Rule        string             `json:"rule"`
-	PrunedAt    pgtype.Timestamptz `json:"pruned_at"`
-}
-
 type PushTicketOutbox struct {
 	ID        int64              `json:"id"`
 	Token     string             `json:"token"`

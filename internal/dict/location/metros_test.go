@@ -161,6 +161,7 @@ func TestLoadMetrosDuplicateExactKeyIsDropped(t *testing.T) {
 func TestMetroValuesCarryNoComma(t *testing.T) {
 	re := regexp.MustCompile(`^[^,]+ \([A-Z]{2}\)$`)
 	for _, line := range strings.Split(metrosTSV, "\n") {
+		line = strings.TrimSuffix(line, "\r") // tolerate a CRLF checkout
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}

@@ -2,9 +2,11 @@ import type { StorybookConfig } from '@storybook/svelte-vite';
 
 const config: StorybookConfig = {
   stories: ['../src/**/*.stories.@(ts|js)'],
-  // Serves static/email-previews/, the HTML the Go mail templates render into
-  // (`go run ./cmd/mail-preview`). Storybook can only frame files under its own
-  // root, so the generator writes them here rather than beside the Go code.
+  // Serves static/email-previews/, the HTML the Go mail templates render into.
+  // The `cmd/mail-preview` generator was removed with the Job Searcher
+  // adaptation, so the directory is whatever was last committed; Storybook can
+  // only frame files under its own root, which is why they live here rather than
+  // beside the Go code.
   staticDirs: ['../static'],
   // No addon-essentials: Storybook folded it into core, and it was never
   // published past 8.6. addon-themes is separate and still shipped — it owns the

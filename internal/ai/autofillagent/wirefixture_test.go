@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/strelov1/freehire/internal/ai/autofillagent"
@@ -103,9 +104,19 @@ func TestFillSimpleWireFixtureIsCurrent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read fixture: %v\nregenerate with: UPDATE_WIRE_FIXTURE=1 go test ./internal/ai/autofillagent/", err)
 	}
-	if string(got) != string(want) {
+	// Compare with the line endings normalised: the frame is JSON, so the content is
+	// what the fixture has to match, not the CRLF a Windows checkout (core.autocrlf)
+	// leaves in the committed file. The extension's own test parses the fixture as
+	// JSON, which is line-ending-insensitive too.
+	if normalizeEOL(string(got)) != normalizeEOL(string(want)) {
 		t.Fatalf("the fill_simple frame no longer matches the fixture the extension's test reads.\n got: %s\nwant: %s\nregenerate with: UPDATE_WIRE_FIXTURE=1 go test ./internal/ai/autofillagent/", got, want)
 	}
+}
+
+// normalizeEOL rewrites CRLF to LF so a file's line endings do not decide whether
+// two payloads match.
+func normalizeEOL(s string) string {
+	return strings.ReplaceAll(s, "\r\n", "\n")
 }
 
 // updateWireFixture reports whether the run was asked to rewrite the fixture.

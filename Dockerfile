@@ -12,7 +12,7 @@ RUN mkdir -p /out \
  && CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/hire ./cmd/server \
  && CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/ \
       ./cmd/ingest ./cmd/enrich ./cmd/reindex ./cmd/tg-ingest ./cmd/tg-extract \
-      ./cmd/backfill-derive ./cmd/liveness ./cmd/notify ./cmd/import-collections \
+      ./cmd/backfill-derive ./cmd/liveness ./cmd/import-collections \
       ./cmd/recount-companies ./cmd/migrate
 # ------------------------------------------------ #
 FROM alpine:3.24 AS typst1
@@ -36,7 +36,7 @@ RUN apt-get update \
  && useradd --system --uid 65532 --gid nonroot --home-dir /app nonroot \
  && pdftotext -v
 
-COPY --from=build /out/hire /out/ingest /out/enrich /out/reindex /out/tg-ingest /out/tg-extract /out/backfill-derive /out/liveness /out/notify /out/import-collections /out/recount-companies /out/migrate /app/
+COPY --from=build /out/hire /out/ingest /out/enrich /out/reindex /out/tg-ingest /out/tg-extract /out/backfill-derive /out/liveness /out/import-collections /out/recount-companies /out/migrate /app/
 # Копируем бинарники из сборочного контейнера build в рабочую директорию контейнера runtime
 COPY --from=build /src/migrations /app/migrations
 # Копируем директорию migrations из сборочного контейнера build в рабочую директорию

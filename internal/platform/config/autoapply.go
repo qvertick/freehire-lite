@@ -6,7 +6,7 @@ import (
 )
 
 // AutoApply holds the tuning knobs for the unattended application-submission worker
-// (cmd/auto-apply). Unlike ApplyForm's fetch (one HTTP call to a public JSON API), one
+// (cmd/auto-apply, removed from this repository). Unlike a one-request capture, one
 // attempt here is a full headless-browser session — scan, reconcile, resolve, and maybe
 // fill and submit — so its call timeout is an order of magnitude more generous, and the
 // lease has to cover the same session, not a single request.
@@ -72,7 +72,7 @@ func LoadAutoApply() AutoApply {
 		a.Concurrency = 1
 	}
 	// The lease must outlast one full browser session, the same reasoning
-	// config.LoadApplyForm applies to a single fetch — a lease shorter than the call
+	// config.LoadEmbed applies to a single fetch — a lease shorter than the call
 	// timeout makes an in-flight attempt reclaimable mid-session, and a lease of 0
 	// re-claims a just-failed entry in a tight loop, burning its retry budget in one run.
 	if floor := int(a.CallTimeout.Seconds()); a.LeaseSeconds < floor {

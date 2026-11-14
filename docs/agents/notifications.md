@@ -1,13 +1,22 @@
 # Notifications
 
-Three independent delivery use cases share one channel *vocabulary* (email,
-Telegram, and mobile push), each with its own small `Notifier`/`Router` pair:
+> **Removed binaries.** The three run-once workers named below (`cmd/notify`,
+> `cmd/remind`, `cmd/nudge`) were deleted with the Job Searcher adaptation, and the
+> `internal/engage/nudge` package went with them in the dead-code sweep that followed.
+> `notify`, `reminder` and the channel packages stay — the delivery rules are the
+> interesting part — but nothing drains them and `cmd/server` mounts no notification
+> route. Every nudge reference below is therefore historical: it records what the third
+> engine did and why, not code that still ships.
+
+Two delivery use cases remain, plus a third that was removed, sharing one channel
+*vocabulary* (email, Telegram, and mobile push), each with its own small
+`Notifier`/`Router` pair:
 
 | Package | Use case | Worker |
 |---|---|---|
-| `internal/engage/notify` | Filter subscriptions — new jobs matching a saved search | `cmd/notify` |
-| `internal/engage/reminder` | Saved-job nudges — come back before the vacancy goes stale | `cmd/remind` |
-| `internal/engage/nudge` | Lifecycle nudges — an application went silent past its stage's threshold, or moved into `interview` | `cmd/nudge` |
+| `internal/engage/notify` | Filter subscriptions — new jobs matching a saved search | `cmd/notify` (removed) |
+| `internal/engage/reminder` | Saved-job nudges — come back before the vacancy goes stale | `cmd/remind` (removed) |
+| `internal/engage/nudge` (removed) | Lifecycle nudges — an application went silent past its stage's threshold, or moved into `interview` | `cmd/nudge` (removed) |
 | `internal/engage/emailnotify` | Email channel (SES) — implements `notify.Notifier` (the `reminder`/`nudge`-side email transports live in their own `transports.go`) | — |
 | `internal/engage/telegramnotify` | Telegram channel (Bot API, deep-link token) | — |
 | `internal/engage/pushnotify` | Mobile push channel (Expo relay) — the bare Expo transport; each of `notify`/`reminder`/`nudge` has its own thin `PushNotifier` on top, same as Telegram/email | — |

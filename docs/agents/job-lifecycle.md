@@ -5,7 +5,7 @@ The open/closed state of a job row, the seven mechanisms that write `closed_at`,
 
 ## Always true
 - A job is open while `closed_at IS NULL`. Closing is a soft state, and the lifecycle never deletes.
-- Nothing hard-deletes jobs. `cmd/prune`, a former campaign that removed postings not belonging on an IT job board (archived in `pruned_jobs`), was retired once the catalogue became broader than IT. `closed_at` keeps meaning "the employer took this down".
+- Nothing hard-deletes jobs. `cmd/prune`, a former campaign that removed postings not belonging on an IT job board (archived in `pruned_jobs`), was retired once the catalogue became broader than IT; migration `0234` drops that archive table, which nothing read. `closed_at` keeps meaning "the employer took this down".
 - A closed row keeps its `public_slug`, enrichment, and `user_jobs` references, and reopens for free.
 - List, search, and company surfaces filter `closed_at IS NULL`. Detail still serves a closed job (with `closed_at`) so links and history don't break.
 - The ingest write stamps `last_seen_at` on every crawl — `RefreshUnchangedJob` when the posting is unchanged, `UpsertJob` otherwise; the post-run sweep closes a provider's jobs unseen for 48h.

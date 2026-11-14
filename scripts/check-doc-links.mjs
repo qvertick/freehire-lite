@@ -12,7 +12,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { dirname, join, normalize } from 'node:path';
+import { dirname, join, normalize, sep } from 'node:path';
 
 // Tracked files only, from git. A walk would have to re-derive .gitignore, and would read
 // whatever a local build left behind — node_modules alone carries thousands of READMEs.
@@ -43,7 +43,10 @@ for (const f of TRACKED) {
  * anyone can follow either.
  */
 function resolvesInRepo(fromFile, target) {
-  const p = normalize(join(dirname(fromFile), target));
+  // `git ls-files` always emits POSIX separators, while node:path honours the host
+  // (backslashes on Windows). Normalise to '/' before matching the tracked set, or
+  // every link looks broken when the script is run on Windows.
+  const p = normalize(join(dirname(fromFile), target)).split(sep).join('/');
   if (p.startsWith('..')) return false; // escaped the repository root
   return TRACKED.has(p) || TRACKED_DIRS.has(p);
 }

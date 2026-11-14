@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -231,6 +230,7 @@ func TestExtractResumeProfile_EmptyText(t *testing.T) {
 }
 
 func TestExtractResumeProfile_PDF(t *testing.T) {
+	requirePDFTool(t)
 	pdf, err := os.ReadFile("testdata/resume_sample.pdf")
 	if err != nil {
 		t.Fatalf("read fixture: %v", err)
@@ -253,9 +253,7 @@ func TestExtractResumeProfile_PDF(t *testing.T) {
 // these, so the endpoint answered 400 "scan or image"; via pdftotext it must now yield the
 // résumé's skills. Skipped when poppler is absent (mirrors the extractor's own test).
 func TestExtractResumeProfile_CanvaCIDPDF(t *testing.T) {
-	if _, err := exec.LookPath("pdftotext"); err != nil {
-		t.Skip("pdftotext not on PATH; skipping Canva PDF upload test")
-	}
+	requirePDFTool(t)
 	pdf, err := os.ReadFile("../../candidate/resume/testdata/canva_cid_identityh.pdf")
 	if err != nil {
 		t.Fatalf("read fixture: %v", err)

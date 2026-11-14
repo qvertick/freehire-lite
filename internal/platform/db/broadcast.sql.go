@@ -9,27 +9,6 @@ import (
 	"context"
 )
 
-const countBroadcastCandidates = `-- name: CountBroadcastCandidates :one
-SELECT count(*)
-FROM users u
-LEFT JOIN notification_settings ns ON ns.user_id = u.id
-WHERE u.email_verified
-  AND COALESCE(ns.news_email_enabled, true)
-  AND NOT EXISTS (
-      SELECT 1 FROM broadcast_emails be
-      WHERE be.user_id = u.id AND be.campaign = $1
-  )
-`
-
-// How many people a campaign would reach right now. Read before sending: a campaign
-// is irreversible and goes to everyone, so the number is worth seeing first.
-func (q *Queries) CountBroadcastCandidates(ctx context.Context, campaign string) (int64, error) {
-	row := q.db.QueryRow(ctx, countBroadcastCandidates, campaign)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const listBroadcastCandidates = `-- name: ListBroadcastCandidates :many
 
 SELECT u.id, u.email
@@ -92,22 +71,4 @@ func (q *Queries) ListBroadcastCandidates(ctx context.Context, arg ListBroadcast
 		return nil, err
 	}
 	return items, nil
-}
-
-const recordBroadcastEmail = `-- name: RecordBroadcastEmail :exec
-INSERT INTO broadcast_emails (user_id, campaign, error)
-VALUES ($1, $2, $3)
-ON CONFLICT (user_id, campaign) DO NOTHING
-`
-
-type RecordBroadcastEmailParams struct {
-	UserID   int64  `json:"user_id"`
-	Campaign string `json:"campaign"`
-	Error    string `json:"error"`
-}
-
-// Closes out one (user, campaign) whether or not the send worked.
-func (q *Queries) RecordBroadcastEmail(ctx context.Context, arg RecordBroadcastEmailParams) error {
-	_, err := q.db.Exec(ctx, recordBroadcastEmail, arg.UserID, arg.Campaign, arg.Error)
-	return err
 }

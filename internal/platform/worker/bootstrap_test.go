@@ -3,12 +3,18 @@ package worker
 import (
 	"context"
 	"os"
+	"runtime"
 	"syscall"
 	"testing"
 	"time"
 )
 
 func TestSignalContextCancelsOnSignal(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// Windows can only be signalled with os.Kill, which cannot be caught, so a
+		// process cannot deliver the cancellation signal to itself here.
+		t.Skip("windows: a process cannot signal itself with a catchable signal")
+	}
 	ctx, stop := signalContext(context.Background())
 	defer stop()
 

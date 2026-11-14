@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"syscall"
 )
 
 // guardDisk refuses a swap-rebuild when free space on dir is below minFreeGB (GiB).
@@ -33,16 +32,4 @@ func guardDisk(dir string, minFreeGB int, probe func(string) (uint64, error)) er
 			free>>30, dir, minFreeGB)
 	}
 	return nil
-}
-
-// statfsFree reports the bytes available to an unprivileged writer on the filesystem
-// backing dir. It is the production probe for guardDisk.
-func statfsFree(dir string) (uint64, error) {
-	var st syscall.Statfs_t
-	if err := syscall.Statfs(dir, &st); err != nil {
-		return 0, err
-	}
-	// Bavail (not Bfree) is the space usable by non-root writers — what Meilisearch
-	// actually gets.
-	return st.Bavail * uint64(st.Bsize), nil
 }

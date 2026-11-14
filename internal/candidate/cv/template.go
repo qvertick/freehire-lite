@@ -27,7 +27,8 @@ type TemplateInfo struct {
 
 // templates is the registry of known templates. A CV's template_id must be one of
 // these; the seam to add more is: append an entry here and drop a matching
-// templates/<id>.typ file, then regenerate the gallery thumbnails with `make cv-previews`.
+// templates/<id>.typ file, then regenerate the gallery thumbnails with
+// GeneratePreviews (the cmd/cv-previews binary was removed).
 var templates = []TemplateInfo{
 	{ID: DefaultTemplateID, Label: "Classic", Style: "single-column · serif"},
 	{ID: "centered", Label: "Centered", Style: "centered · serif"},

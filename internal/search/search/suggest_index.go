@@ -76,12 +76,6 @@ func suggestSettings() *meilisearch.Settings {
 	}
 }
 
-// EnsureSuggestIndex creates the dictionary index and applies its settings. Idempotent.
-func (c *Client) EnsureSuggestIndex(ctx context.Context) error {
-	idx := c.manager.Index(suggestIndexUID)
-	return c.ensure(ctx, idx, suggestIndexUID, "id", suggestSettings())
-}
-
 // NewSuggestRebuild starts a full rebuild of the dictionary index. The dictionary is
 // derived wholesale from a catalogue pass, so there is no incremental path and no
 // outbox: every run replaces it, and the swap is what keeps a reader from ever seeing

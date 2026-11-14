@@ -2,3 +2,22 @@
 # piped straight into `sh` — a CRLF-mangled shebang breaks both. Force LF
 # regardless of core.autocrlf on a Windows checkout.
 *.sh text eol=lf
+
+# The text formats the toolchain reads as DATA, not prose. A CRLF checkout
+# (core.autocrlf=true, the Windows default) leaves a trailing \r on every line,
+# and the parsers that read these files split on "\n" or compare bytes — so the
+# \r silently becomes part of a city name, a metro label or a JSON fixture. The
+# loaders that already tolerate it say so in their comments ("tolerate a CRLF
+# checkout"); these rules stop the problem at the source, so a fresh checkout on
+# Windows does not need that tolerance in the first place.
+#
+# *.go is here for the same reason the AGENTS.md asks for `gofmt -l .` to print
+# nothing: gofmt reports every CRLF Go file as unformatted.
+#
+# `text` normalises to LF in the index and `eol=lf` puts LF in the working tree.
+# On Linux and macOS both are already the case, so this changes nothing there.
+*.go text eol=lf
+*.tsv text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.sql text eol=lf
