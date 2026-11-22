@@ -1,0 +1,128 @@
+name: CD Release & Multi-Arch Images
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' # Запустится автоматически, когда ты запушишь тег вида v0.2.0
+  workflow_dispatch: # Также можно запустить вручную кнопкой во вкладке Actions
+
+# Выдаем права КОНКРЕТНО этому файлу (помнишь, глобально мы оставили строгий Read-only?)
+permissions:
+  contents: read
+  packages: write # Разрешаем загружать готовые Docker-образы в раздел Packages репозитория
+
+env:
+  REGISTRY: ghcr.io
+  # Имена твоих образов в реестре GitHub (в нижнем регистре — это требование Docker)
+  IMAGE_APP: ghcr.io/qvertick/freehire-app
+  IMAGE_WEB: ghcr.io/qvertick/freehire-web
+
+jobs:
+  # =========================================================================
+  # ЭТАП 1: Сборка и проверка живого Docker Compose (Артефакт-тест)
+  # =========================================================================
+  verify-compose:
+    name: Smoke Test Full Stack
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build & start full DockerCompose stack
+        run: |
+          docker compose -f DockerCompose.yml up -d --build
+
+      - name: Wait & verify app (:8080) and web (:8090) are alive
+        run: |
+          echo "Ждем запуска сервисов..."
+          sleep 12
+          docker compose -f DockerCompose.yml ps
+
+          # 1. Проверяем, что ни один контейнер не упал (Exited)
+          if [ -n "$(docker compose -f DockerCompose.yml ps -q --status exited)" ]; then
+            echo "❌ Критическая ошибка: один из контейнеров упал при старте!"
+            docker compose -f DockerCompose.yml logs
+            exit 1
+          fi
+
+          # 2. Проверяем, что SvelteKit + Nginx на :8090 отдает страницу (HTTP 200)
+          curl --fail --retry 5 --retry-delay 2 http://localhost:8090/ || (docker compose -f DockerCompose.yml logs && exit 1)
+          echo "✅ Веб-интерфейс и API живы!"
+
+      - name: Clean up
+        if: always()
+        run: docker compose -f DockerCompose.yml down -v
+
+  # =========================================================================
+  # ЭТАП 2: Кроссплатформенная сборка (amd64 + arm64) и публикация в Packages
+  # =========================================================================
+  publish-images:
+    name: Build & Push Multi-Arch Docker Images
+    needs: verify-compose # Запустится ТОЛЬКО если Этап 1 прошел без единой ошибки!
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Включаем эмулятор QEMU, чтобы собрать образы не только под Intel/AMD, но и под Apple Silicon (arm64)
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # Настраиваем продвинутый сборщик Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Авторизуемся в твоем GitHub Container Registry через временный GITHUB_TOKEN (пароли не нужны!)
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Генерируем красивые теги для образов (например: v0.2.0 и latest)
+      - name: Extract metadata (tags) for App
+        id: meta-app
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_APP }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Extract metadata (tags) for Web
+        id: meta-web
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_WEB }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # Собираем и пушим образ бэкенда (app) на 2 архитектуры
+      - name: Build and push App image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-app.outputs.tags }}
+          labels: ${{ steps.meta-app.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Собираем и пушим образ фронтенда (web) на 2 архитектуры
+      - name: Build and push Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./web/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-web.outputs.tags }}
+          labels: ${{ steps.meta-web.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

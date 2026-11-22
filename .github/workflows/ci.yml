@@ -1,0 +1,156 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.diagram-design'
+      - '.gitignore'
+      - 'LICENSE'
+  pull_request:
+    branches: [ "main" ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.diagram-design'
+      - '.gitignore'
+      - 'LICENSE'
+  workflow_dispatch:
+
+jobs:
+  # 1. Разведчик: проверяет, какие папки изменились
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      extension: ${{ steps.filter.outputs.extension }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'cmd/**'
+              - 'internal/**'
+              - 'migrations/**'
+              - 'services/**'
+              - 'harvest/**'
+              - 'go.mod'
+              - 'go.sum'
+              - 'Dockerfile'
+              - 'DockerCompose*.yml'
+            frontend:
+              - 'web/**'
+            extension:
+              - 'extension/**'
+
+  # 2. Бэкенд (Go + Postgres pgvector + Meilisearch + Redis + компиляция бинарников)
+  backend-go:
+    name: Go Build, Migrations & Tests
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Start backing services & apply migrations
+        run: docker compose -f DockerCompose.windows.yml up -d --wait
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Build server & utilities
+        run: |
+          mkdir -p bin
+          CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o bin/hire ./cmd/server
+          CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o bin/ \
+            ./cmd/ingest ./cmd/enrich ./cmd/reindex ./cmd/tg-ingest ./cmd/tg-extract \
+            ./cmd/backfill-derive ./cmd/liveness ./cmd/import-collections \
+            ./cmd/recount-companies ./cmd/migrate
+
+      - name: Run Go vet & tests
+        env:
+          DATABASE_URL: "postgres://hire:hire@localhost:5432/hire?sslmode=disable"
+          REDIS_URL: "redis://localhost:6379"
+          MEILI_URL: "http://localhost:7700"
+          MEILI_MASTER_KEY: "dev-insecure-meili-key"
+        run: |
+          go vet ./...
+          go test -v ./...
+
+      - name: Upload compiled binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: freehire-binaries-linux
+          path: bin/
+          retention-days: 7
+
+      - name: Dump logs on failure & stop containers
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "failure" ]; then
+            docker compose -f DockerCompose.windows.yml logs
+          fi
+          docker compose -f DockerCompose.windows.yml down -v
+
+  # 3. Фронтенд (SvelteKit в web/)
+  frontend-web:
+    name: Web Build & Check
+    needs: changes
+    if: ${{ needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./web
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'web/package-lock.json'
+
+      - name: Install & Build Web
+        run: |
+          npm ci
+          npm run build
+
+  # 4. Браузерное расширение (WXT в extension/)
+  browser-extension:
+    name: Extension Build & Check
+    needs: changes
+    if: ${{ needs.changes.outputs.extension == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./extension
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'extension/package-lock.json'
+
+      - name: Install & Build Extension
+        run: |
+          npm ci
+          npm run build
