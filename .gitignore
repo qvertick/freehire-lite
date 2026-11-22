@@ -230,4 +230,4 @@ extension/*.zip
 # Local research notes (competitor scans, market notes) — kept out of the repository.
 /docs/research/
 
-/CI.CD
+/CI-CD_gitlab
