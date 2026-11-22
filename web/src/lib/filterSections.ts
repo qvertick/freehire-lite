@@ -8,7 +8,8 @@
 // group is a compile error (svelte-check): a newly added backend category can't
 // silently fall out of the modal.
 
-import { CATEGORY_VALUES, FACET_ALIASES, type Category } from './generated/contracts';
+import { CATEGORY_VALUES, type Category } from './generated/contracts';
+import { FACET_ALIASES } from './generated/facetAliases';
 import { optionMatches } from './facets';
 import { categoryLabel } from './labels';
 

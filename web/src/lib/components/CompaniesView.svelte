@@ -178,13 +178,15 @@
         message={filters.value.q || filters.active > 0 ? 'No matching companies.' : 'No companies yet.'}
       />
     {:else}
-      <div class="flex flex-col gap-3">
+      <!-- The list cascades in — the shared `reveal-stagger` utility from app.css — and
+           each row lifts under the pointer on `lift`, the same motion the job cards use. -->
+      <div class="reveal-stagger flex flex-col gap-3">
         {#each companies.items as company (company.slug)}
           {@const industry = company.industries?.[0]}
           {@const hq = company.hq_country ? countryLabel(company.hq_country) : null}
           <a
             href={resolve('/companies/[slug]', { slug: company.slug })}
-            class="flex items-start gap-2.5 rounded-lg border border-border px-4 py-3 transition-colors hover:bg-accent"
+            class="lift flex items-start gap-2.5 rounded-lg border border-border px-4 py-3 hover:bg-accent"
           >
             <EntityLogo name={company.name} src={companyLogoUrl(company.name) ?? undefined} shape="square" size="sm" />
             <div class="flex min-w-0 flex-1 flex-col gap-1">

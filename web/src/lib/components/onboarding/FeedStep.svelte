@@ -5,7 +5,7 @@
   import { api } from '#lib/api.js';
   import { CATEGORY_GROUPS } from '#lib/filterSections.js';
   import { rankOptionMatches } from '#lib/facets.js';
-  import { FACET_ALIASES } from '#lib/generated/contracts.js';
+  import { FACET_ALIASES } from '#lib/generated/facetAliases.js';
   import { TECH_CATEGORY_VALUES } from '#lib/generated/contracts.js';
   import { orderSpecializations } from '#lib/onboardingSteps.js';
   import { MAX_SPECIALIZATIONS } from '#lib/profileLimits.js';

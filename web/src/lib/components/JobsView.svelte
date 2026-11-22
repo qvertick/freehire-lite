@@ -954,8 +954,13 @@
         />
       {:else}
         <!-- Busy while held-over rows stand in for a reload underneath them (see
-             `holdover`): the rows are real but about to be replaced. -->
-        <div class="flex flex-col gap-3" aria-busy={holdingOver}>
+             `holdover`): the rows are real but about to be replaced.
+
+             `reveal-stagger` cascades the rows in — a shared utility from app.css, so the
+             list owns the motion without a stylesheet of its own. The rows are keyed by
+             slug, so a filter change replaces them and the cascade runs again on the new
+             set: the reader sees that the list changed, not just that it re-sorted. -->
+        <div class="reveal-stagger flex flex-col gap-3" aria-busy={holdingOver}>
           {#each visibleJobs as job (job.public_slug)}
             <JobRow {job} {onHide} />
           {/each}

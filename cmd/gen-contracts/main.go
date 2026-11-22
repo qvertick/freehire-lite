@@ -23,7 +23,6 @@ import (
 	"github.com/strelov1/freehire/internal/dict/industrytag"
 	"github.com/strelov1/freehire/internal/dict/location"
 	"github.com/strelov1/freehire/internal/dict/perks"
-	"github.com/strelov1/freehire/internal/dict/skilltag"
 	"github.com/strelov1/freehire/internal/dict/vocab"
 	"github.com/strelov1/freehire/internal/ingest/sources"
 	"github.com/strelov1/freehire/internal/job/collections"
@@ -63,7 +62,13 @@ func run() error {
 	if err := os.WriteFile(skillDescriptionsPath, []byte(genSkillDescriptions()), 0o644); err != nil {
 		return err
 	}
-	return os.WriteFile(skillAliasesPath, []byte(genSkillAliases()), 0o644)
+	if err := os.WriteFile(skillAliasesPath, []byte(genSkillAliases()), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(skillLabelsPath, []byte(genSkillLabels()), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(facetAliasesPath, []byte(genFacetAliases()), 0o644)
 }
 
 // genStructs runs tygo for Enrichment then Job (Job references Enrichment, so
@@ -492,12 +497,17 @@ func genVocab() string {
 	// surface showing one to a reader had the same choice to make: print "postgresql" or
 	// invent a prettifier. Generated from the skilltag dictionary that owns the canonical
 	// set, so one spelling serves them all and a new skill cannot arrive unlabelled.
-	b.WriteString(emitMap("SkillLabels", "SKILL_LABELS", skilltag.Labels()))
+	//
+	// It ships in its own module (skillLabels.ts), not here: the catalog is ~31 kB and
+	// contracts.ts is imported by nearly every module in the app, so a page that wanted
+	// one three-word constant paid for the catalog too. See vocabtables.go.
+	//
 	// Facet slug→shorthand-aliases for the picker's search: the same curated terms
 	// used to tag titles, so typing "swe" or "data engineer" finds the specialization
 	// that tags them. Keyed by category and seniority slug — the two dictionaries this
-	// is built from, and the two facets that read it.
-	b.WriteString(emitMapOfSlices("FacetAliases", "FACET_ALIASES", facetAliases()))
+	// is built from, and the two facets that read it. Also its own module
+	// (facetAliases.ts), and for the same reason: it is ~96 kB.
+	//
 	// The company-tag registry (slug, display copy, kind) — the source of truth for
 	// the /collections hub and the job-search facet, generated so the frontend copy
 	// cannot drift from the Go registry that decides membership.

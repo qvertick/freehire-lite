@@ -13,6 +13,39 @@ export default defineConfig({
     // always-loaded stylesheet even though most pages show no flags. Externalizing
     // lets the browser fetch only the handful of flags a page actually renders.
     assetsInlineLimit: (filePath) => (filePath.includes('flag-icons/flags/') ? false : undefined),
+    // Rolldown splits one chunk per module by default, and SvelteKit turns every
+    // component and helper into a module: the build produces ~418 chunks, and the
+    // homepage's graph holds ~112 of them.
+    //
+    // Three ways to merge them were tried and none of them is available here:
+    //
+    // - `output.codeSplitting.experimentalInlineCommonChunks` is the one lever that
+    //   removes files outright, but it is experimental and demands
+    //   `preserveEntrySignatures: false` — exactly what SvelteKit's client router
+    //   cannot give up: the route nodes are entry chunks whose exports the router
+    //   reads. It stays off.
+    // - `output.codeSplitting.minSize` / `minShareCount` are only fallbacks for
+    //   `codeSplitting.groups`; with no groups they change nothing. Measured: the
+    //   build still produced 418 chunks.
+    // - `output.advancedChunks.minSize` (the deprecated spelling) has the same
+    //   problem: without groups it is inert. Measured: still 418 chunks.
+    //
+    // `codeSplitting.groups` IS supported, and it works on module ids, not on
+    // SvelteKit's per-route chunks: grouping the shared library code would put
+    // every component that two routes use into one file, and a route that imports
+    // one of them would download all of them. That trades a request count problem
+    // for a bytes problem, which is the wrong trade.
+    //
+    // What is left is the honest measurement, so it is scripted instead of
+    // guessed: `node scripts/bundle-report.mjs` prints the chunk makeup and
+    // `node scripts/first-load.mjs` prints the homepage's chunk graph. Both read
+    // the built output, so a change that makes the app heavier is visible rather
+    // than assumed.
+    rolldownOptions: {
+      output: {
+        codeSplitting: true,
+      },
+    },
   },
   // SvelteKit owns routing/SSR; `#lib` is a package.json subpath import, so no manual
   // alias is needed. tailwindcss() must precede sveltekit().

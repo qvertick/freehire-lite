@@ -173,3 +173,162 @@
 .onboarding-seen [data-onboarding-banner] {
   display: none;
 }
+
+/* ------------------------------------------------------------------ motion --
+   One entrance utility for the whole app, and it lives here rather than in each
+   page that wants it: four components used to carry a private copy of the same
+   six lines, and a fifth (a job list) wanted one and could not have it without
+   copying it too.
+
+   The animation touches `opacity` and `transform` only. Both are handled by the
+   compositor, so the rise costs no layout and no paint — it is the difference
+   between a page that animates on an 8GB laptop and one that stutters on it.
+   Nothing here runs a timer, listens to scroll, or touches `offsetHeight`.
+
+   The delay is a custom property (`--d`) rather than a second class per step, so
+   a page can stagger its own headings with inline `style="--d:80ms"` and a list
+   can stagger itself with `.reveal-stagger` below, without a stylesheet per page. */
+.reveal {
+  opacity: 0;
+  animation: fh-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  animation-delay: var(--d, 0ms);
+}
+
+@keyframes fh-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The same entrance, but quick. For the ONE element a page cannot afford to wait
+   for: the headline above the fold, which is usually the page's LCP element. A
+   0.7s fade there is 0.7s of LCP added to the page's most important number, and
+   the difference between the two is not visible — the eye reads a rise either
+   way. Sections further down keep the long one, where the delay costs nothing
+   because the reader has not arrived yet. */
+.reveal-quick {
+  opacity: 0;
+  animation: fh-rise 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  animation-delay: var(--d, 0ms);
+}
+
+/* The same entrance for a list, without the list having to number its rows: the
+   children carry the animation, the container carries the cascade.
+
+   The rise here is shorter and shallower than the one above (0.4s, 6px) and the
+   step is 40ms, because this class is meant for the page's MAIN list — the rows
+   a reader came for. Its first row is usually the page's LCP element, and every
+   millisecond this holds it back is a millisecond of LCP. A decorative section
+   can afford the long rise; the job feed cannot, so it gets the short one.
+
+   Only the first dozen children are staggered: past that the last row waits long
+   enough that the reader has already scrolled past it, so a longer cascade buys
+   nothing and costs them half a second of waiting. */
+.reveal-stagger > * {
+  opacity: 0;
+  animation: fh-rise-short 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  animation-delay: var(--d, 0ms);
+}
+
+@keyframes fh-rise-short {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.reveal-stagger > :nth-child(1) {
+  --d: 0ms;
+}
+.reveal-stagger > :nth-child(2) {
+  --d: 40ms;
+}
+.reveal-stagger > :nth-child(3) {
+  --d: 80ms;
+}
+.reveal-stagger > :nth-child(4) {
+  --d: 120ms;
+}
+.reveal-stagger > :nth-child(5) {
+  --d: 160ms;
+}
+.reveal-stagger > :nth-child(6) {
+  --d: 200ms;
+}
+.reveal-stagger > :nth-child(7) {
+  --d: 240ms;
+}
+.reveal-stagger > :nth-child(8) {
+  --d: 280ms;
+}
+.reveal-stagger > :nth-child(9) {
+  --d: 320ms;
+}
+.reveal-stagger > :nth-child(10) {
+  --d: 360ms;
+}
+.reveal-stagger > :nth-child(11) {
+  --d: 400ms;
+}
+.reveal-stagger > :nth-child(12) {
+  --d: 440ms;
+}
+
+/* A card that lifts under the pointer. The transition is on `transform` and
+   `box-shadow` only — no layout-affecting property is animated — and the lift
+   is one pixel, which reads as "alive" rather than "bouncy". `will-change` is
+   deliberately absent: it pins a compositor layer for every card on the page,
+   and a list of thirty cards is thirty layers of VRAM on the machine this has to
+   run on. The promotion happens on hover instead, where the layer is wanted. */
+.lift {
+  transition:
+    transform 160ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 160ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .lift:hover {
+    transform: translateY(-1px);
+  }
+}
+
+/* A pressed control, for touch and mouse alike. It scales the element rather
+   than moving it, so the hit target never shifts under the finger. */
+.press {
+  transition: transform 120ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.press:active {
+  transform: scale(0.985);
+}
+
+/* Reduced motion is a request, not a suggestion: the entrance becomes instant
+   and the card stops moving. Nothing is hidden by it — `opacity: 1` is set
+   explicitly, so a reader who asked for less motion still gets the content
+   rather than an invisible page. */
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .reveal-quick,
+  .reveal-stagger > * {
+    opacity: 1;
+    animation: none;
+  }
+  .lift,
+  .press {
+    transition: none;
+  }
+  .lift:hover,
+  .press:active {
+    transform: none;
+  }
+}
+

@@ -10,7 +10,7 @@ import {
 import { CATEGORY_GROUPS, RAIL, type RailGroup } from './filterSections';
 import { EXPERIENCE_PRESETS, FRESHNESS_PRESETS } from './filterControls';
 import { fuzzyMatch } from './fuzzy';
-import { SKILL_LABELS } from './generated/contracts';
+import { SKILL_LABELS } from './generated/skillLabels';
 
 export const FILTER_SEARCH_MIN_QUERY = 2;
 export const FILTER_SEARCH_LIMIT = 48;

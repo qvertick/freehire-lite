@@ -275,28 +275,7 @@
 </div>
 
 <style>
-  /* One orchestrated page-load: each .reveal rises in, staggered by its --d.
-     Mirrors HomeView so the landing shares the site's motion language. */
-  .reveal {
-    opacity: 0;
-    animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
-    animation-delay: var(--d, 0ms);
-  }
-  @keyframes rise {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .reveal {
-      animation: none;
-      opacity: 1;
-    }
-  }
+  /* The page-load rise is the shared `.reveal` utility in app.css — it used to
+     be a private copy of the same rule, which is what the landing mirrored from
+     HomeView. The reduced-motion fallback lives there too. */
 </style>

@@ -1,0 +1,29 @@
+Listening on http://0.0.0.0:3000
+TypeError: Invalid URL
+    at new URL (node:internal/url:840:25)
+    at fetch (node_modules\.pnpm\@sveltejs+kit@3.1.0_@opente_3691e8e56319e8d220c95f531b79ab66\node_modules\@sveltejs\kit\src\runtime\server\page\load_data.js:94:19)
+    at call (src\lib\api.ts:623:19)
+    at request (src\lib\api.ts:648:19)
+    at Object.searchJobs (src\lib\api.ts:780:26)
+    at load (src\routes\jobs\+page.server.ts:36:6)
+TypeError: Invalid URL
+    at new URL (node:internal/url:840:25)
+    at fetch (node_modules\.pnpm\@sveltejs+kit@3.1.0_@opente_3691e8e56319e8d220c95f531b79ab66\node_modules\@sveltejs\kit\src\runtime\server\page\load_data.js:94:19)
+    at call (src\lib\api.ts:623:19)
+    at request (src\lib\api.ts:648:19)
+    at Object.searchJobs (src\lib\api.ts:780:26)
+    at load (src\routes\jobs\+page.server.ts:36:6)
+TypeError: Invalid URL
+    at new URL (node:internal/url:840:25)
+    at fetch (node_modules\.pnpm\@sveltejs+kit@3.1.0_@opente_3691e8e56319e8d220c95f531b79ab66\node_modules\@sveltejs\kit\src\runtime\server\page\load_data.js:94:19)
+    at call (src\lib\api.ts:623:19)
+    at request (src\lib\api.ts:648:19)
+    at Object.searchJobs (src\lib\api.ts:780:26)
+    at load (src\routes\jobs\+page.server.ts:36:6)
+TypeError: Invalid URL
+    at new URL (node:internal/url:840:25)
+    at fetch (node_modules\.pnpm\@sveltejs+kit@3.1.0_@opente_3691e8e56319e8d220c95f531b79ab66\node_modules\@sveltejs\kit\src\runtime\server\page\load_data.js:94:19)
+    at call (src\lib\api.ts:623:19)
+    at request (src\lib\api.ts:648:19)
+    at Object.searchJobs (src\lib\api.ts:780:26)
+    at load (src\routes\jobs\+page.server.ts:36:6)

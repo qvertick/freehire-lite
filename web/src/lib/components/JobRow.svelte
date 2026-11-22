@@ -350,10 +350,14 @@
 <!-- The card chrome (border, background, hover) lives on this wrapper, not the <a>,
      so an optional footer row can sit inside the same bordered box as a sibling of
      the link — interactive footer controls never nest inside the navigation <a>.
-     `group` lets the hover-revealed hide control fade in on card hover. -->
+     `group` lets the hover-revealed hide control fade in on card hover.
+     `lift` is the shared hover-lift utility from app.css: a one-pixel rise and a
+     shadow, both compositor-only, which is what makes the card feel alive without
+     costing the 8GB laptop a repaint. It replaces the bare `transition` class,
+     whose color-only transition would have been overridden by it anyway. -->
 <div
   data-testid="job-card"
-  class="group relative rounded-xl border border-border bg-card transition hover:border-brand hover:bg-accent"
+  class="group lift relative rounded-xl border border-border bg-card hover:border-brand hover:bg-accent"
 >
 <a
   href={resolve('/jobs/[slug]', { slug: job.public_slug })}

@@ -17,10 +17,15 @@ import { metroLabel } from './metro';
 import {
   WORK_MODE_VALUES, SENIORITY_VALUES, CATEGORY_VALUES,
   EMPLOYMENT_TYPE_VALUES, RELOCATION_VALUES, ENGLISH_LEVEL_VALUES,
-  COMPANY_TYPE_VALUES, DOMAIN_VALUES, INDUSTRY_VALUES, FACET_ALIASES,
-  AI_ARCHETYPE_VALUES, SKILL_LABELS, INDUSTRY_LABELS, ROLE_TYPE_VALUES, SOURCE_TYPE_VALUES,
+  COMPANY_TYPE_VALUES, DOMAIN_VALUES, INDUSTRY_VALUES,
+  AI_ARCHETYPE_VALUES, INDUSTRY_LABELS, ROLE_TYPE_VALUES, SOURCE_TYPE_VALUES,
   CLEARANCE_LEVEL_VALUES, PERK_VALUES, PERK_LABELS, EQUITY_VALUES, ENGAGEMENT_VALUES, ENGAGEMENT_LABELS, ENGAGEMENT_MARKETS,
 } from './generated/contracts';
+// The two big tables live in their own modules so that a page importing this one
+// does not also ship them: contracts.ts is imported nearly everywhere, and these
+// two are ~31 kB and ~96 kB of source. See cmd/gen-contracts/vocabtables.go.
+import { FACET_ALIASES } from './generated/facetAliases';
+import { SKILL_LABELS } from './generated/skillLabels';
 import { fuzzyMatch } from './fuzzy';
 import {
   REGION_LABELS, SENIORITY_LABELS, EMPLOYMENT_LABELS, WORK_MODE_LABELS,

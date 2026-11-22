@@ -164,9 +164,11 @@
 </script>
 
 <!-- One row of shortcuts into the catalogue. Two rows use it — the crafts and the
-     places — and they differ only in what they list, so they are one shape. -->
-{#snippet chipRow(label: string, chips: Chip[])}
-  <div class="flex flex-col items-center gap-2">
+     places — and they differ only in what they list, so they are one shape. The row's
+     own entrance delay is a parameter, so the second row lands after the first
+     instead of both arriving together. -->
+{#snippet chipRow(label: string, chips: Chip[], delay: string)}
+  <div class="reveal-quick flex flex-col items-center gap-2" style="--d:{delay}">
   <p class="text-xs uppercase tracking-wide text-muted-foreground/80" aria-hidden="true">{label}</p>
   <nav aria-label={label} class="flex flex-wrap justify-center gap-2">
     {#each chips as chip (chip.href)}
@@ -218,8 +220,14 @@
   <div class="flex w-full max-w-2xl flex-col items-center gap-6">
     <!-- No mark or wordmark here: the header carries both, three centimetres above and
          on the same screen. Repeating them made the page introduce itself twice before
-         it said anything. -->
-    <div class="flex flex-col items-center gap-5 text-center">
+         it said anything.
+
+         The three blocks below rise in one after another (`reveal-quick` and its `--d`
+         delays, the shared utilities in app.css). `reveal-quick` rather than `reveal`
+         because the headline is this page's LCP element: the long entrance would add
+         its own duration to the number the page is judged by, and a reader who has
+         not seen the headline yet cannot read the sentence under it either. -->
+    <div class="reveal-quick flex flex-col items-center gap-5 text-center" style="--d:0ms">
       <h1 class="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
         Every tech job, straight from the source.
       </h1>
@@ -235,7 +243,7 @@
          the chips and figures that follow it in the page, and below the sticky header
          (`z-40`), so a panel left open while the page scrolls slides under the header
          instead of over it. -->
-    <div class="relative z-30 flex w-full">
+    <div class="reveal-quick relative z-30 flex w-full" style="--d:90ms">
       <!-- The visible examples are roles; the accessible name is the broad one, because
            this box does search companies and skills too. An example is a starting point
            rather than a boundary, and a role is what people actually type first.
@@ -257,12 +265,12 @@
     </div>
 
     {#if crafts.length > 0}
-      {@render chipRow('Biggest specializations', crafts)}
+      {@render chipRow('Biggest specializations', crafts, '180ms')}
     {/if}
     {#if places.length > 1}
       <!-- Only with real countries behind it: Remote alone is a row that looks like a
            measurement and is a constant. -->
-      {@render chipRow('Locations', places)}
+      {@render chipRow('Locations', places, '260ms')}
     {/if}
 
     {@render onward(resolve('/jobs'), 'See every specialization and location in the catalogue')}
@@ -276,7 +284,10 @@
        zero. `tabular-nums` keeps the row from twitching as the counts move. -->
   <section class="border-t border-border py-10">
     <SectionLabel as="h2" text="the catalogue, today" />
-    <dl class="mt-6 grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-4">
+    <!-- The four figures cascade in (`reveal-stagger` from app.css): one shared
+         utility, so the numbers read as a row arriving rather than four separate
+         fades that happen to be near each other. -->
+    <dl class="reveal-stagger mt-6 grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-4">
       {#each figures as f (f.label)}
         <!-- `flex-col-reverse` so the number reads first and the label sits under it,
              while the DOM keeps the term before its description. The label is written
@@ -309,8 +320,8 @@
        install line in the `pre`, which does not wrap. That took the track to 416px on a
        390px phone and gave the whole page a horizontal scrollbar. Tailwind's `grid-cols-*`
        are `repeat(N, minmax(0, 1fr))` for exactly this, and the `pre` scrolls itself. -->
-  <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-    <div class="flex flex-col gap-5 rounded-xl border border-border p-6 sm:p-8">
+  <div class="reveal-stagger mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <div class="lift flex flex-col gap-5 rounded-xl border border-border p-6 sm:p-8">
       <h3 class="text-2xl font-semibold tracking-tight">Search and track from your AI assistant.</h3>
       <p class="text-sm leading-relaxed text-muted-foreground">
         Add freehire to your assistant and ask for jobs in plain words.
@@ -327,7 +338,7 @@
       </div>
     </div>
 
-    <div class="flex flex-col gap-5 rounded-xl border border-border p-6 sm:p-8">
+    <div class="lift flex flex-col gap-5 rounded-xl border border-border p-6 sm:p-8">
       <div class="flex flex-col gap-3">
         <h3 class="text-2xl font-semibold tracking-tight">Apply where you already are.</h3>
         <p class="text-sm leading-relaxed text-muted-foreground">

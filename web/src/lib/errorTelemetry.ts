@@ -1,12 +1,6 @@
-import { SeverityNumber } from "@opentelemetry/api";
-import { resourceFromAttributes } from "@opentelemetry/resources";
-import {
-  BatchLogRecordProcessor,
-  LoggerProvider,
-  type LogRecordExporter,
-} from "@opentelemetry/sdk-logs";
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-proto";
 import { isTransientNoise } from "./transientNoise.js";
+import type { LogRecordExporter } from "@opentelemetry/sdk-logs";
+import type { OtelException, OtelLogger } from "./otelLogger.js";
 
 interface ErrorTelemetryOptions {
   endpoint?: string;
@@ -39,47 +33,36 @@ function sanitize(value: string, limit: number): string {
       /\b[a-z0-9_-]*(?:token|password|passwd|secret|api[_-]?key|authorization|credentials?)["']?\s*[:=]\s*(?:"(?:\\.|[^"\\])*"?|'(?:\\.|[^'\\])*'?|(?:(?:basic|bearer)\s+)?[^\s,;"']+)/gi,
       "[redacted]",
     )
-    .replace(
-      /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,
-      "[token]",
-    )
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "[token]")
     .slice(0, limit);
 }
 
+// The OpenTelemetry SDK lives in its own module and is fetched only when an
+// endpoint is configured — see otelLogger.ts for why it must not be imported
+// here. `ready` is the promise for that fetch; a failure resolves to undefined,
+// which is "no logger", not a thrown error: telemetry must never be the reason
+// a page breaks.
 export function createErrorTelemetry(options: ErrorTelemetryOptions) {
   if (!options.endpoint) return undefined;
-  let provider: LoggerProvider;
-  try {
-    provider = new LoggerProvider({
-      resource: resourceFromAttributes({
-        "service.name": options.service,
-        "service.version": options.version || "unknown",
-        "deployment.environment.name": options.environment || "development",
+  const endpoint = options.endpoint;
+  const ready: Promise<OtelLogger | undefined> = import("./otelLogger.js")
+    .then((module) =>
+      module.createOtelLogger({
+        endpoint,
+        service: options.service,
+        environment: options.environment,
+        version: options.version,
+        exporter: options.exporter,
       }),
-      logRecordLimits: {
-        attributeCountLimit: 8,
-        attributeValueLengthLimit: 8192,
-      },
-      processors: [
-        new BatchLogRecordProcessor({
-          exporter:
-            options.exporter ??
-            new OTLPLogExporter({
-              url: options.endpoint,
-              timeoutMillis: 3000,
-              concurrencyLimit: 1,
-            }),
-          maxQueueSize: 20,
-          maxExportBatchSize: 5,
-          scheduledDelayMillis: 500,
-          exportTimeoutMillis: 3000,
-        }),
-      ],
-    });
-  } catch {
-    return undefined;
-  }
-  const logger = provider.getLogger("freehire.errors");
+    )
+    .catch(() => undefined);
+
+  // The emits are chained rather than fired and forgotten: `flush` has to wait
+  // for every exception captured before it to reach the exporter, or a test (or
+  // a shutdown) would read the log before the last record arrived. The chain
+  // keeps their order, which is the order the errors happened in.
+  let chain: Promise<void> = Promise.resolve();
+
   const seen = new Set<string>();
   let windowStart = Date.now();
   return {
@@ -119,16 +102,10 @@ export function createErrorTelemetry(options: ErrorTelemetryOptions) {
         }
         if (seen.size >= 20 || seen.has(key)) return;
         seen.add(key);
-        logger.emit({
-          severityNumber: SeverityNumber.ERROR,
-          severityText: "ERROR",
-          body: "Unhandled exception",
-          attributes: {
-            "event.name": "exception",
-            "exception.type": sanitize(type, 128),
-            "exception.message": message,
-            "exception.stacktrace": stack,
-          },
+        const exception: OtelException = { type, message, stack };
+        chain = chain.then(async () => {
+          const logger = await ready;
+          logger?.emitException(exception);
         });
       } catch {
         /* Reporting must never become an application error. */
@@ -136,14 +113,18 @@ export function createErrorTelemetry(options: ErrorTelemetryOptions) {
     },
     async flush() {
       try {
-        await provider.forceFlush({ timeoutMillis: 3000 });
+        await chain;
+        const logger = await ready;
+        await logger?.flush();
       } catch {
         /* Best effort. */
       }
     },
     async shutdown() {
       try {
-        await provider.shutdown();
+        await chain;
+        const logger = await ready;
+        await logger?.shutdown();
       } catch {
         /* Best effort. */
       }
@@ -159,8 +140,8 @@ const EXTENSION_FRAME = /^(?:chrome|moz|safari|safari-web|edge)-extension:\/\//i
 function fromExtensionOnly(error: unknown): boolean {
   if (!(error instanceof Error) || typeof error.stack !== "string") return false;
   const frames = error.stack.split("\n").filter((line) => /^\s*at\s+|@\S+:\d+/.test(line));
-  return frames.length > 0 && frames.every((line) => {
-    const location = line.trim().replace(/^at\s+(?:.*?\s+\()?/, "").replace(/^.*?@/, "");
+  return frames.length > 0 && frames.every((frame) => {
+    const location = frame.trim().replace(/^\s*at\s+(?:.*?\s+\()?/, "").replace(/^.*?@/, "");
     return EXTENSION_FRAME.test(location);
   });
 }
