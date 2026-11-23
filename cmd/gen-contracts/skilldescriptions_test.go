@@ -20,9 +20,21 @@ func TestSharedContractsCarryNoDescriptionText(t *testing.T) {
 			t.Errorf("contracts.ts carries the description of %q; it belongs in %s", slug, skillDescriptionsPath)
 		}
 	}
-	// The labels stay where they were — this is an addition, not a move.
-	if !strings.Contains(shared, "SKILL_LABELS") {
-		t.Error("contracts.ts no longer carries SKILL_LABELS")
+	// The label table moved the same way the descriptions did: contracts.ts is on the
+	// critical path of every page, and the slug→display-name catalog is ~31 kB of it.
+	// A re-export would be a static import and would ride along exactly as before, so
+	// the table lives in its own module and the consumers import it from there.
+	if strings.Contains(shared, "SKILL_LABELS") {
+		t.Errorf("contracts.ts carries SKILL_LABELS; it belongs in %s", skillLabelsPath)
+	}
+	labels := genSkillLabels()
+	if !strings.Contains(labels, "export const SKILL_LABELS = {") {
+		t.Errorf("the generated label module is missing the SKILL_LABELS catalog:\n%s", labels)
+	}
+	for slug := range skilltag.Labels() {
+		if !strings.Contains(labels, quoteTS(slug)) {
+			t.Errorf("the generated label module is missing %q", slug)
+		}
 	}
 }
 

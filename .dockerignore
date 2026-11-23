@@ -5,6 +5,12 @@ web/.svelte-kit
 web/build
 design-system/node_modules
 design-system/dist
+# The extension is built by npm, not by the images — its dependency tree and
+# build output only slow the build context down.
+extension/node_modules
+extension/.output
+extension/.wxt
+node_modules
 .git
 openspec
 design-system/storybook-static/

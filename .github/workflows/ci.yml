@@ -19,6 +19,13 @@ on:
       - 'LICENSE'
   workflow_dispatch:
 
+# Явные права вместо умолчаний репозитория: содержимое читать можно,
+# список изменённых файлов в PR — тоже (paths-filter ходит в API за списком
+# файлов, и без этого права он падает с "Resource not accessible by integration").
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   # 1. Разведчик: проверяет, какие папки изменились
   changes:
@@ -30,6 +37,10 @@ jobs:
       extension: ${{ steps.filter.outputs.extension }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Полная история: paths-filter для push-событий сравнивает HEAD с HEAD~,
+          # а при shallow clone предыдущего коммита просто нет.
+          fetch-depth: 0
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -63,8 +74,13 @@ jobs:
       - name: Start backing services & apply migrations
         run: |
           cp -n .env.example .env || true
+          # Три сервиса с healthcheck'ами: --wait дожидается, пока каждый станет healthy.
           docker compose -f DockerCompose.windows.yml up -d --wait db redis meilisearch
-          docker compose -f DockerCompose.windows.yml up meili-init
+          # meili-init — одноразовый контейнер (PATCH /experimental-features), он
+          # сразу завершается. `docker compose up meili-init` без -d ждал бы
+          # завершения ВСЕХ сервисов, а meilisearch не останавливается никогда —
+          # шаг бы висел до таймаута. `run --rm` выполняет его как одноразовый.
+          docker compose -f DockerCompose.windows.yml run --rm meili-init
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -89,7 +105,10 @@ jobs:
           MEILI_MASTER_KEY: "dev-insecure-meili-key"
         run: |
           go vet ./...
-          go test -v ./...
+          # integration-теги компилируются, но не запускаются: без них два guard'а
+          # (depguard и проверка слоёв) молча выключаются (см. AGENTS.md).
+          go vet -tags=integration ./...
+          go test ./...
 
       - name: Upload compiled binaries
         uses: actions/upload-artifact@v4
@@ -106,55 +125,78 @@ jobs:
         if: always()
         run: docker compose -f DockerCompose.windows.yml down -v
 
-
-  # 3. Фронтенд (SvelteKit в web/)
+    # 3. Фронтенд (SvelteKit в web/)
   frontend-web:
     name: Web Build & Check
     needs: changes
     if: ${{ needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./web
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # pnpm, а не npm: в репозитории лежит pnpm-lock.yaml, packageManager —
+      # pnpm@11.7.0. `npm ci` без package-lock.json падает, а setup-node с
+      # cache: npm и cache-dependency-path: web/package-lock.json падает ещё
+      # раньше — файл не существует.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'web/package-lock.json'
+          node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: |
+            web/pnpm-lock.yaml
+            design-system/pnpm-lock.yaml
 
-      - name: Install & Build Web
-        run: |
-          npm ci
-          npm run build
+      # design-system ставится первым: web/depends on it через link:, и pnpm
+      # не ставит зависимости связанного пакета сам.
+      - name: Install design-system
+        run: pnpm --dir design-system install --frozen-lockfile
 
-  # 4. Браузерное расширение (WXT в extension/)
+      - name: Install web
+        run: pnpm --dir web install --frozen-lockfile
+
+      - name: Build web
+        run: pnpm --dir web run build
+
+    # 4. Браузерное расширение (WXT в extension/)
   browser-extension:
     name: Extension Build & Check
     needs: changes
     if: ${{ needs.changes.outputs.extension == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./extension
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # pnpm нужен только ради design-system (design-system/ управляется pnpm).
+      # Само расширение — единственный JS-пакет в репозитории на npm.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: 'extension/package-lock.json'
 
-      - name: Install & Build Extension
-        run: |
-          npm ci
-          npm run build
+      # extension/ тянет design-system через file:, а npm не ставит зависимости
+      # связанного пакета — без этой строки сборка падает на резолве.
+      - name: Install design-system
+        run: pnpm --dir design-system install --frozen-lockfile
+
+      - name: Install extension
+        run: npm --prefix extension ci
+
+      - name: Build extension
+        run: npm --prefix extension run build
