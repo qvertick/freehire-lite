@@ -60,7 +60,7 @@ jobs:
             extension:
               - 'extension/**'
 
-    # 2. Бэкенд (Go + Postgres pgvector + Meilisearch + Redis + компиляция бинарников)
+  # 2. Бэкенд (Go + Postgres pgvector + Meilisearch + Redis + компиляция бинарников)
   backend-go:
     name: Go Build, Migrations & Tests
     needs: changes
@@ -70,6 +70,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install system dependencies (poppler-utils)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends poppler-utils
 
       - name: Start backing services & apply migrations
         run: |
